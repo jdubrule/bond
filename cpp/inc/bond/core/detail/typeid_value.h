@@ -180,7 +180,7 @@ inline void BasicTypeContainer(T& var, BondDataType type, Reader& input, uint32_
 
         case bond::BondDataType::BT_STRING:
             return DeserializeElements<Protocols>(var, value<std::string, Reader&>(input, false), size);
-            
+
         case bond::BondDataType::BT_WSTRING:
             return DeserializeElements<Protocols>(var, value<std::wstring, Reader&>(input, false), size);
 
@@ -713,7 +713,7 @@ inline MatchingMapByElement(T& var, BondDataType keyType, BondDataType elementTy
     {
         case bond::BondDataType::BT_STRING:
             return MapByKey<Protocols>(var, keyType, value<std::string, Reader&>(input, false), input, size);
-            
+
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type::second_type>(elementType));
 
