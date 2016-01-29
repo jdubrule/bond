@@ -72,7 +72,7 @@ public:
         // matches JSON payload. If it doesn't, nothing horrible will happen, but
         // we might not indicate a required field missing for an int32 field if we 
         // mistake a string member with matching name for it.
-        return FindField(id, metadata, type, type == BT_INT32);
+        return FindField(id, metadata, type, type == BondDataType::BT_INT32);
     }
 
     const Field* FindField(uint16_t id, const Metadata& metadata, BondDataType type, bool is_enum);

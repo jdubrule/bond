@@ -53,7 +53,7 @@ TEST_CASE_BEGIN(OutputBufferBlobs)
 #pragma warning(disable: 4127) // conditional expression is constant
 #endif // _MSC_VER
 
-        if (Reader::magic == bond::SIMPLE_JSON_PROTOCOL)
+        if (Reader::magic == bond::ProtocolType::SIMPLE_JSON_PROTOCOL)
             UT_AssertAreEqual(std::size_t(1), buffers.size());
         else
             UT_AssertAreEqual(blobs.blobs.size() * 2 + 1, buffers.size());

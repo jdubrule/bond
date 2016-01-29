@@ -39,7 +39,7 @@ FILE* OpenFile(const char* path, const char* mode)
 
 inline bool IsValidType(bond::BondDataType type)
 {
-    return type >= bond::BT_BOOL && type <= bond::BT_WSTRING;
+    return type >= bond::BondDataType::BT_BOOL && type <= bond::BondDataType::BT_WSTRING;
 }
 
 template <typename Reader>
@@ -56,16 +56,16 @@ bool TryProtocol(Reader reader, int confidence = 5)
 
         for (int i = 0; i < confidence; ++i, reader.ReadFieldEnd(), reader.ReadFieldBegin(type, id))
         {
-            if (type == bond::BT_STOP)
+            if (type == bond::BondDataType::BT_STOP)
                 break;
 
-            if (type == bond::BT_STOP_BASE)
+            if (type == bond::BondDataType::BT_STOP_BASE)
                 continue;
 
             if (!IsValidType(type))
                 return false;
 
-            if (type == bond::BT_SET || type == bond::BT_LIST)
+            if (type == bond::BondDataType::BT_SET || type == bond::BondDataType::BT_LIST)
             {
                 bond::BondDataType element_type;
 
@@ -75,7 +75,7 @@ bool TryProtocol(Reader reader, int confidence = 5)
                     return false;
             }
 
-            if (type == bond::BT_MAP)
+            if (type == bond::BondDataType::BT_MAP)
             {
                 std::pair<bond::BondDataType, bond::BondDataType> element_type;
 
@@ -121,9 +121,9 @@ Protocol Guess(InputFile input)
 
     input.Read(word);
 
-    if (word == bond::FAST_PROTOCOL
-     || word == bond::COMPACT_PROTOCOL
-     || word == bond::SIMPLE_PROTOCOL)
+    if (word == bond::ProtocolType::FAST_PROTOCOL
+     || word == bond::ProtocolType::COMPACT_PROTOCOL
+     || word == bond::ProtocolType::SIMPLE_PROTOCOL)
         return marshal;
 
     if (TryProtocol(mbp))

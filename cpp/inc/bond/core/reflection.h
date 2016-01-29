@@ -50,13 +50,13 @@ typedef std::map<std::string, std::string> Attributes;
 
 
 // field is required
-using required_field_modifier = std::integral_constant<bond::Modifier, bond::Required>;
+using required_field_modifier = std::integral_constant<bond::Modifier, bond::Modifier::Required>;
 
 // field is optional
-using optional_field_modifier = std::integral_constant<bond::Modifier, bond::Optional>;
+using optional_field_modifier = std::integral_constant<bond::Modifier, bond::Modifier::Optional>;
 
 // field is required optional
-using required_optional_field_modifier = std::integral_constant<bond::Modifier, bond::RequiredOptional>;
+using required_optional_field_modifier = std::integral_constant<bond::Modifier, bond::Modifier::RequiredOptional>;
 
 
 /// @brief Field description in compile-time schema
@@ -754,51 +754,51 @@ get_type_id<std::pair<T1, T2> >::value = std::make_pair(
 
 template <> struct
 get_type_id<bool>
-    : std::integral_constant<BondDataType, BT_BOOL> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_BOOL> {};
 
 template <> struct
 get_type_id<uint8_t>
-    : std::integral_constant<BondDataType, BT_UINT8> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT8> {};
 
 template <> struct
 get_type_id<uint16_t>
-    : std::integral_constant<BondDataType, BT_UINT16> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT16> {};
 
 template <> struct
 get_type_id<uint32_t>
-    : std::integral_constant<BondDataType, BT_UINT32> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT32> {};
 
 template <> struct
 get_type_id<uint64_t>
-    : std::integral_constant<BondDataType, BT_UINT64> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT64> {};
 
 template <> struct
 get_type_id<int8_t>
-    : std::integral_constant<BondDataType, BT_INT8> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT8> {};
 
 template <> struct
 get_type_id<int16_t>
-    : std::integral_constant<BondDataType, BT_INT16> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT16> {};
 
 template <> struct
 get_type_id<int32_t>
-    : boost::integral_constant<BondDataType, BT_INT32> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT32> {};
 
 template <> struct
 get_type_id<int64_t>
-    : std::integral_constant<BondDataType, BT_INT64> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT64> {};
 
 template <> struct
 get_type_id<float>
-    : std::integral_constant<BondDataType, BT_FLOAT> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_FLOAT> {};
 
 template <> struct
 get_type_id<double>
-    : boost::integral_constant<BondDataType, BT_DOUBLE> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_DOUBLE> {};
 
 template <> struct
 get_type_id<void>
-    : std::integral_constant<BondDataType, BT_UNAVAILABLE> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UNAVAILABLE> {};
 
 template <typename T> struct
 get_type_id<T, typename boost::enable_if<std::is_enum<T>>::type>
@@ -806,11 +806,11 @@ get_type_id<T, typename boost::enable_if<std::is_enum<T>>::type>
 
 template <typename T> struct
 get_type_id<T, typename boost::enable_if<is_bond_type<T>>::type>
-    : std::integral_constant<BondDataType, BT_STRUCT> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_STRUCT> {};
 
 template <typename T> struct
 get_type_id<T, typename boost::enable_if<is_set_container<typename std::remove_const<T>::type>>::type>
-    : std::integral_constant<BondDataType, BT_SET> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_SET> {};
 
 template <typename T> struct
 get_type_id<T, typename boost::enable_if<is_map_container<typename std::remove_const<T>::type>>::type>
@@ -835,15 +835,15 @@ get_type_id
 
 template <typename T, typename Enable = void> struct
 get_list_sub_type_id
-    : std::integral_constant<ListSubType, NO_SUBTYPE> {};
+    : std::integral_constant<ListSubType, ListSubType::NO_SUBTYPE> {};
 
 template <typename T> struct
 get_list_sub_type_id<T, typename boost::enable_if<is_nullable<typename remove_const<T>::type> >::type>
-    : std::integral_constant<ListSubType, NULLABLE_SUBTYPE> {};
+    : std::integral_constant<ListSubType, ListSubType::NULLABLE_SUBTYPE> {};
 
 template <typename T> struct
 get_list_sub_type_id<T, typename boost::enable_if<is_blob<typename remove_const<T>::type> >::type>
-    : std::integral_constant<ListSubType, BLOB_SUBTYPE> {};
+    : std::integral_constant<ListSubType, ListSubType::BLOB_SUBTYPE> {};
 
 
 class PrimitiveTypes

@@ -53,43 +53,43 @@ bool IsMatching(BondDataType type)
 {
     switch (type)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return is_matching<bool, T>::value;
 
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return is_matching<uint8_t, T>::value;
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return is_matching<uint16_t, T>::value;
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return is_matching<uint32_t, T>::value;
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return is_matching<uint64_t, T>::value;
 
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return is_matching<float, T>::value;
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_DOUBLE:
             return is_matching<double, T>::value;
 
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return is_matching<std::string, T>::value;
             
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return is_matching<std::wstring, T>::value;
 
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return is_matching<int8_t, T>::value;
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return is_matching<int16_t, T>::value;
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return is_matching<int32_t, T>::value;
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return is_matching<int64_t, T>::value;
 
         default:
@@ -104,43 +104,43 @@ inline bool BasicTypeField(uint16_t id, const Metadata& metadata, BondDataType t
 {
     switch (type)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return transform.Field(id, metadata, value<bool, Reader&>(input));
 
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return transform.Field(id, metadata, value<uint8_t, Reader&>(input));
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return transform.Field(id, metadata, value<uint16_t, Reader&>(input));
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return transform.Field(id, metadata, value<uint32_t, Reader&>(input));
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return transform.Field(id, metadata, value<uint64_t, Reader&>(input));
             
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return transform.Field(id, metadata, value<float, Reader&>(input));
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_DOUBLE:
             return transform.Field(id, metadata, value<double, Reader&>(input));
 
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return transform.Field(id, metadata, value<std::string, Reader&>(input));
 
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return transform.Field(id, metadata, value<std::wstring, Reader&>(input));
 
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return transform.Field(id, metadata, value<int8_t, Reader&>(input));
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return transform.Field(id, metadata, value<int16_t, Reader&>(input));
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return transform.Field(id, metadata, value<int32_t, Reader&>(input));
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return transform.Field(id, metadata, value<int64_t, Reader&>(input));
 
         default:
@@ -157,43 +157,43 @@ inline void BasicTypeContainer(T& var, BondDataType type, Reader& input, uint32_
 
     switch (type)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return DeserializeElements<Protocols>(var, value<bool, Reader&>(input, false), size);
 
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return DeserializeElements<Protocols>(var, value<uint8_t, Reader&>(input, false), size);
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return DeserializeElements<Protocols>(var, value<uint16_t, Reader&>(input, false), size);
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return DeserializeElements<Protocols>(var, value<uint32_t, Reader&>(input, false), size);
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return DeserializeElements<Protocols>(var, value<uint64_t, Reader&>(input, false), size);
 
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return DeserializeElements<Protocols>(var, value<float, Reader&>(input, false), size);
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_DOUBLE:
             return DeserializeElements<Protocols>(var, value<double, Reader&>(input, false), size);
 
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return DeserializeElements<Protocols>(var, value<std::string, Reader&>(input, false), size);
             
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return DeserializeElements<Protocols>(var, value<std::wstring, Reader&>(input, false), size);
 
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return DeserializeElements<Protocols>(var, value<int8_t, Reader&>(input, false), size);
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return DeserializeElements<Protocols>(var, value<int16_t, Reader&>(input, false), size);
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return DeserializeElements<Protocols>(var, value<int32_t, Reader&>(input, false), size);
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return DeserializeElements<Protocols>(var, value<int64_t, Reader&>(input, false), size);
 
         default:
@@ -229,7 +229,7 @@ inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t 
 {
     switch (type)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return DeserializeElements<Protocols>(var, value<bool, Reader&>(input, false), size);
 
         default:
@@ -248,7 +248,7 @@ inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t 
 {
     switch (type)
     {
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return DeserializeElements<Protocols>(var, value<std::string, Reader&>(input, false), size);
             
         default:
@@ -267,7 +267,7 @@ inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t 
 {
     switch (type)
     {
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return DeserializeElements<Protocols>(var, value<std::wstring, Reader&>(input, false), size);
 
         default:
@@ -286,10 +286,10 @@ inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t 
 {
     switch (type)
     {
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return DeserializeElements<Protocols>(var, value<float, Reader&>(input, false), size);
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_DOUBLE:
             return DeserializeElements<Protocols>(var, value<double, Reader&>(input, false), size);
 
         default:
@@ -308,16 +308,16 @@ inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t 
 {
     switch (type)
     {
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return DeserializeElements<Protocols>(var, value<uint8_t, Reader&>(input, false), size);
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return DeserializeElements<Protocols>(var, value<uint16_t, Reader&>(input, false), size);
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return DeserializeElements<Protocols>(var, value<uint32_t, Reader&>(input, false), size);
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return DeserializeElements<Protocols>(var, value<uint64_t, Reader&>(input, false), size);
 
         default:
@@ -336,16 +336,16 @@ inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t 
 {
     switch (type)
     {
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return DeserializeElements<Protocols>(var, value<int8_t, Reader&>(input, false), size);
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return DeserializeElements<Protocols>(var, value<int16_t, Reader&>(input, false), size);
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return DeserializeElements<Protocols>(var, value<int32_t, Reader&>(input, false), size);
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return DeserializeElements<Protocols>(var, value<int64_t, Reader&>(input, false), size);
 
         default:
@@ -388,7 +388,7 @@ inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& 
 {
     switch (keyType)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return DeserializeMapElements<Protocols>(var, value<bool, Reader&>(input, false), element, size);
 
         default:
@@ -410,7 +410,7 @@ inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& 
 {
     switch (keyType)
     {
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return DeserializeMapElements<Protocols>(var, value<std::string, Reader&>(input, false), element, size);
 
         default:
@@ -432,7 +432,7 @@ inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& 
 {
     switch (keyType)
     {
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return DeserializeMapElements<Protocols>(var, value<std::wstring, Reader&>(input, false), element, size);
 
         default:
@@ -454,10 +454,10 @@ inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& 
 {
     switch (keyType)
     {
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return DeserializeMapElements<Protocols>(var, value<float, Reader&>(input, false), element, size);
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_FLOAT:
             return DeserializeMapElements<Protocols>(var, value<double, Reader&>(input, false), element, size);
 
         default:
@@ -479,16 +479,16 @@ inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& 
 {
     switch (keyType)
     {
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return DeserializeMapElements<Protocols>(var, value<uint8_t, Reader&>(input, false), element, size);
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return DeserializeMapElements<Protocols>(var, value<uint16_t, Reader&>(input, false), element, size);
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return DeserializeMapElements<Protocols>(var, value<uint32_t, Reader&>(input, false), element, size);
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return DeserializeMapElements<Protocols>(var, value<uint64_t, Reader&>(input, false), element, size);
 
         default:
@@ -510,16 +510,16 @@ inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& 
 {
     switch (keyType)
     {
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return DeserializeMapElements<Protocols>(var, value<int8_t, Reader&>(input, false), element, size);
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return DeserializeMapElements<Protocols>(var, value<int16_t, Reader&>(input, false), element, size);
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return DeserializeMapElements<Protocols>(var, value<int32_t, Reader&>(input, false), element, size);
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return DeserializeMapElements<Protocols>(var, value<int64_t, Reader&>(input, false), element, size);
 
         default:
@@ -542,43 +542,43 @@ inline MapByKey(T& var, BondDataType keyType, const E& element, Reader& input, u
 {
     switch (keyType)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return DeserializeMapElements<Protocols>(var, value<bool, Reader&>(input, false), element, size);
 
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return DeserializeMapElements<Protocols>(var, value<uint8_t, Reader&>(input, false), element, size);
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return DeserializeMapElements<Protocols>(var, value<uint16_t, Reader&>(input, false), element, size);
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return DeserializeMapElements<Protocols>(var, value<uint32_t, Reader&>(input, false), element, size);
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return DeserializeMapElements<Protocols>(var, value<uint64_t, Reader&>(input, false), element, size);
 
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return DeserializeMapElements<Protocols>(var, value<float, Reader&>(input, false), element, size);
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_DOUBLE:
             return DeserializeMapElements<Protocols>(var, value<double, Reader&>(input, false), element, size);
 
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return DeserializeMapElements<Protocols>(var, value<std::string, Reader&>(input, false), element, size);
             
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return DeserializeMapElements<Protocols>(var, value<std::wstring, Reader&>(input, false), element, size);
 
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return DeserializeMapElements<Protocols>(var, value<int8_t, Reader&>(input, false), element, size);
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return DeserializeMapElements<Protocols>(var, value<int16_t, Reader&>(input, false), element, size);
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return DeserializeMapElements<Protocols>(var, value<int32_t, Reader&>(input, false), element, size);
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return DeserializeMapElements<Protocols>(var, value<int64_t, Reader&>(input, false), element, size);
 
         default:
@@ -613,43 +613,43 @@ inline void MapByElement(T& var, BondDataType keyType, BondDataType elementType,
 {
     switch (elementType)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return MapByKey<Protocols>(var, keyType, value<bool, Reader&>(input, false), input, size);
 
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return MapByKey<Protocols>(var, keyType, value<uint8_t, Reader&>(input, false), input, size);
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return MapByKey<Protocols>(var, keyType, value<uint16_t, Reader&>(input, false), input, size);
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return MapByKey<Protocols>(var, keyType, value<uint32_t, Reader&>(input, false), input, size);
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return MapByKey<Protocols>(var, keyType, value<uint64_t, Reader&>(input, false), input, size);
 
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return MapByKey<Protocols>(var, keyType, value<float, Reader&>(input, false), input, size);
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_DOUBLE:
             return MapByKey<Protocols>(var, keyType, value<double, Reader&>(input, false), input, size);
 
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return MapByKey<Protocols>(var, keyType, value<std::string, Reader&>(input, false), input, size);
             
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return MapByKey<Protocols>(var, keyType, value<std::wstring, Reader&>(input, false), input, size);
 
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return MapByKey<Protocols>(var, keyType, value<int8_t, Reader&>(input, false), input, size);
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return MapByKey<Protocols>(var, keyType, value<int16_t, Reader&>(input, false), input, size);
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return MapByKey<Protocols>(var, keyType, value<int32_t, Reader&>(input, false), input, size);
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return MapByKey<Protocols>(var, keyType, value<int64_t, Reader&>(input, false), input, size);
 
         default:
@@ -689,7 +689,7 @@ inline MatchingMapByElement(T& var, BondDataType keyType, BondDataType elementTy
 {
     switch (elementType)
     {
-        case bond::BT_BOOL:
+        case bond::BondDataType::BT_BOOL:
             return MapByKey<Protocols>(var, keyType, value<bool, Reader&>(input, false), input, size);
 
         default:
@@ -711,7 +711,7 @@ inline MatchingMapByElement(T& var, BondDataType keyType, BondDataType elementTy
 {
     switch (elementType)
     {
-        case bond::BT_STRING:
+        case bond::BondDataType::BT_STRING:
             return MapByKey<Protocols>(var, keyType, value<std::string, Reader&>(input, false), input, size);
             
         default:
@@ -733,7 +733,7 @@ inline MatchingMapByElement(T& var, BondDataType keyType, BondDataType elementTy
 {
     switch (elementType)
     {
-        case bond::BT_WSTRING:
+        case bond::BondDataType::BT_WSTRING:
             return MapByKey<Protocols>(var, keyType, value<std::wstring, Reader&>(input, false), input, size);
 
         default:
@@ -755,10 +755,10 @@ inline MatchingMapByElement(T& var, BondDataType keyType, BondDataType elementTy
 {
     switch (elementType)
     {
-        case bond::BT_FLOAT:
+        case bond::BondDataType::BT_FLOAT:
             return MapByKey<Protocols>(var, keyType, value<float, Reader&>(input, false), input, size);
 
-        case bond::BT_DOUBLE:
+        case bond::BondDataType::BT_DOUBLE:
             return MapByKey<Protocols>(var, keyType, value<double, Reader&>(input, false), input, size);
 
         default:
@@ -780,16 +780,16 @@ inline MatchingMapByElement(T& var, BondDataType keyType, BondDataType elementTy
 {
     switch (elementType)
     {
-        case bond::BT_UINT8:
+        case bond::BondDataType::BT_UINT8:
             return MapByKey<Protocols>(var, keyType, value<uint8_t, Reader&>(input, false), input, size);
 
-        case bond::BT_UINT16:
+        case bond::BondDataType::BT_UINT16:
             return MapByKey<Protocols>(var, keyType, value<uint16_t, Reader&>(input, false), input, size);
 
-        case bond::BT_UINT32:
+        case bond::BondDataType::BT_UINT32:
             return MapByKey<Protocols>(var, keyType, value<uint32_t, Reader&>(input, false), input, size);
 
-        case bond::BT_UINT64:
+        case bond::BondDataType::BT_UINT64:
             return MapByKey<Protocols>(var, keyType, value<uint64_t, Reader&>(input, false), input, size);
 
         default:
@@ -811,16 +811,16 @@ inline MatchingMapByElement(T& var, BondDataType keyType, BondDataType elementTy
 {
     switch (elementType)
     {
-        case bond::BT_INT8:
+        case bond::BondDataType::BT_INT8:
             return MapByKey<Protocols>(var, keyType, value<int8_t, Reader&>(input, false), input, size);
 
-        case bond::BT_INT16:
+        case bond::BondDataType::BT_INT16:
             return MapByKey<Protocols>(var, keyType, value<int16_t, Reader&>(input, false), input, size);
 
-        case bond::BT_INT32:
+        case bond::BondDataType::BT_INT32:
             return MapByKey<Protocols>(var, keyType, value<int32_t, Reader&>(input, false), input, size);
 
-        case bond::BT_INT64:
+        case bond::BondDataType::BT_INT64:
             return MapByKey<Protocols>(var, keyType, value<int64_t, Reader&>(input, false), input, size);
 
         default:
