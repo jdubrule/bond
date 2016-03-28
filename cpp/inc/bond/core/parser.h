@@ -142,6 +142,7 @@ private:
     {
     }
 
+
     template <typename T, typename Transform>
     typename boost::enable_if_c<detail::is_reader<Input>::value && !is_nested_field<T>::value
                              && !is_fast_path_field<T, Transform>::value, bool>::type
@@ -376,7 +377,6 @@ private:
 
         _input.ReadFieldEnd();
     }
-
  
     template <typename T, typename Transform>
     typename boost::enable_if_c<is_nested_field<T>::value
