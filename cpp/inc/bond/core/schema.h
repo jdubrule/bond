@@ -351,5 +351,35 @@ inline const std::map<std::string, T>& GetEnumNames()
     return GetNameToValueMap(T());
 }
 
+namespace detail
+{
+    template<typename F, typename Schema, typename Seq = std::make_integer_sequence<int, Schema::fieldCount::value>>
+    struct for_each_field_impl;
+
+    // A partial specialization of the above.
+    // Here we convert the integer_sequence into a sequence of integers S
+    // We can use variable argument expansion to generate the code inline
+    // with this sequence.
+    //
+    template<typename F, typename t_schema, int... S>
+    struct for_each_field_impl<F, t_schema, std::integer_sequence<int, S...>>
+    {
+        static void foreach(F f)
+        {
+            auto doThese =
+            {
+                0,
+                ((void) f(t_schema::field<S>::type()), 0)...
+            };
+        }
+    };
+}
+
+template<typename t_schema, typename F>
+inline
+void for_each_field(F f)
+{
+    detail::for_each_field_impl<F, t_schema>::foreach(f);
+}
 
 } // namespace bond

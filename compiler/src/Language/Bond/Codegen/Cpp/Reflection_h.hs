@@ -52,10 +52,15 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
         public: struct var
         {#{fieldTemplates structFields}};
 
-        private: typedef boost::mpl::list<> fields0;
-        #{newlineSep 2 pushField indexedFields}
+        private:
+        typedef boost::mpl::list<> fields0;
+        #{newlineSep 2 pushField reverseIndexedFields}
 
         public: typedef #{typename}fields#{length structFields}::type fields;
+
+        public: typedef std::integral_constant<size_t, #{length structFields}> fieldCount;
+        template<size_t fieldIndex> struct field {};
+        #{newlineSep 2 fieldTemplateArray indexedFields}
         #{constructor}
         
         static bond::Metadata GetMetadata()
@@ -88,15 +93,22 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
           where
             static Field {..} = [lt|(void)s_#{fieldName}_metadata;|]
         
-        -- reversed list of field names zipped with indexes
+        -- list of field names zipped with indexes
         indexedFields :: [(String, Int)]
-        indexedFields = zipWith ((,) . fieldName) (reverse structFields) [0..]
+        indexedFields = zipWith ((,) . fieldName) structFields [0..]
+
+        -- reversed list of field names zipped with indexes
+        reverseIndexedFields :: [(String, Int)]
+        reverseIndexedFields = zipWith ((,) . fieldName) (reverse structFields) [0..]
 
         baseType (Just base) = cppType base
         baseType Nothing = "bond::no_base"
 
         pushField (field, i) =
             [lt|private: typedef #{typename}boost::mpl::push_front<fields#{i}, #{typename}var::#{field}>::type fields#{i + 1};|]
+
+        fieldTemplateArray (field, i) =
+            [lt|template<> struct field<#{i}> { typedef #{typename} var::#{field} type; };|]
 
         fieldMetadata Field {..} =
             [lt|private: static const bond::Metadata s_#{fieldName}_metadata;|]

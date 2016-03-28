@@ -338,6 +338,9 @@ schema<Unknown, Unused>
     {
         typedef no_base base;
         typedef boost::mpl::list<>::type fields;
+
+        typedef std::integral_constant<size_t, 0> fieldCount;
+
         static const Metadata metadata;
 
         type()

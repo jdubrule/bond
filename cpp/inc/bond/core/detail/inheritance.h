@@ -73,6 +73,32 @@ inline const Base& base_cast(const T& obj)
     return static_cast<const Base&>(obj);
 }
 
+template<typename C, typename TSchema, typename Seq = std::make_integer_sequence<int, TSchema::fieldCount::value>>
+struct FieldIterate;
+
+// A partial specialization of the above.
+// Here we convert the integer_sequence into a sequence of integers S
+// We can use variable argument expansion to generate the code inline
+// with this sequence.
+//
+template<typename C, typename TSchema, int... S>
+struct FieldIterate<C, TSchema, std::integer_sequence<int, S...>>
+{
+    static bool DoFieldIterate(const C &caller)
+    {
+        caller.BeginFields();
+
+        bool done = false;
+        auto runThese = {
+            false,
+            done = !done && caller.DoField<TSchema::field<S>::type>()...
+        };
+
+        caller.EndFields();
+
+        return done;
+    }
+};
 
 template <typename Input, typename Parser>
 class ParserInheritance
@@ -101,12 +127,42 @@ protected:
 
         detail::StructEnd(_input, true);
 
-        static_cast<Parser*>(this)->SkipFields(typename boost::mpl::begin<typename T::fields>::type());
+        for_each_field<T>([this](auto field) { static_cast<Parser*>(this)->SkipOneField(field); });
+//        static_cast<Parser*>(this)->SkipFields(typename boost::mpl::begin<typename T::fields>::type());
 
         return result;
     }
 
-    
+    template<typename TTransform>
+    struct ReadTheFields
+    {
+        ReadTheFields(const TTransform &t, Input & in, Parser* p) :
+            m_transform(t),
+            _input(in),
+            m_parser(p)
+        {}
+
+        void BeginFields() const
+        {
+            m_parser->BeginFields(m_transform);
+        }
+
+        template<typename TField>
+        bool DoField() const
+        {
+            return m_parser->ReadOneField(TField(), m_transform);
+        }
+
+        void EndFields() const
+        {
+            m_parser->EndFields(m_transform);
+        }
+
+        const TTransform & m_transform;
+        Input & _input;
+        Parser * m_parser;
+    };
+
     template <typename T, typename Transform>
     typename boost::disable_if_c<(hierarchy_depth<T>::value > expected_depth<Transform>::value), bool>::type
     Read(const T&, const Transform& transform)
@@ -116,7 +172,9 @@ protected:
         // and then we read to the transform the fields of the top level struct.
         transform.Begin(T::metadata);
         ReadBase(base_class<T>(), transform);
-        bool result = static_cast<Parser*>(this)->ReadFields(typename boost::mpl::begin<typename T::fields>::type(), transform);
+
+        bool result = FieldIterate<ReadTheFields<Transform>, T>::DoFieldIterate(ReadTheFields<Transform>(transform, _input, static_cast<Parser*>(this)));
+
         transform.End();
         return result;
     }

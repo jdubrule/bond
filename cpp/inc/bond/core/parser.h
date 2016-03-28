@@ -22,15 +22,14 @@ namespace detail
 class ParserCommon
 {
 protected:
-    template <typename Transform>
-    bool
-    ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform&)
-    {
-        return false;
-    }
 
     template <typename Fields>
     void SkipFields(const Fields&)
+    {
+    }
+
+    template <typename TField>
+    void SkipOneField(const TField&)
     {
     }
 
@@ -109,33 +108,37 @@ public:
 protected:
     using detail::ParserInheritance<Input, StaticParser<Input> >::_input;
     using detail::ParserInheritance<Input, StaticParser<Input> >::_base;
-    using detail::ParserCommon::ReadFields;
 
 private:
-    template <typename Fields>
-    void SkipFields(const Fields& fields)
+    template <typename TField>
+    void SkipOneField(const TField& field)
     {
         // Skip the structure by reading fields to Null transform
-        ReadFields(fields, Null());
+        ReadOneField(field, Null());
     }
 
     // use compile-time schema
-    template <typename Fields, typename Transform>
-    bool
-    ReadFields(const Fields&, const Transform& transform)
+    template <typename Transform>
+    void
+    BeginFields(const Transform&)
     {
-        typedef typename boost::mpl::deref<Fields>::type Head;
-
-        if (detail::ReadFieldOmitted(_input))
-            OmittedField(Head(), transform);
-        else
-            if (bool done = NextField(Head(), transform))
-                return done;
-        
-        return ReadFields(typename boost::mpl::next<Fields>::type(), transform);
     }
 
+    template <typename t_field, typename Transform>
+    bool
+    ReadOneField(const t_field&, const Transform& transform)
+    {
+        if (detail::ReadFieldOmitted(_input))
+            return OmittedField(t_field(), transform);
+        else
+            return NextField(t_field(), transform);
+    }
 
+    template <typename Transform>
+    void
+    EndFields(const Transform&)
+    {
+    }
     template <typename T, typename Transform>
     typename boost::enable_if_c<detail::is_reader<Input>::value && !is_nested_field<T>::value
                              && !is_fast_path_field<T, Transform>::value, bool>::type
@@ -171,7 +174,6 @@ private:
         return transform.Field(field, bonded<typename T::field_type, Input>(_input));
     }
 
-
     template <typename T, typename Transform>
     typename boost::disable_if<detail::is_reader<Input, T>, bool>::type
     NextField(const T&, const Transform& transform)
@@ -186,33 +188,6 @@ private:
         ReadFields(fields, Null());
     }
 
-    bool
-    ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
-    {}
-
-    template<typename Transform>
-    bool
-    ReadRuntimeField(const RuntimeSchema& schema, const Transform &transform, const FieldDef &field)
-    {
-        if (detail::ReadFieldOmitted(_input))
-        {
-            transform.OmittedField(field.id, field.metadata, field.type.id);
-            return false;
-        }
-
-        if (field.type.id == bond::BondDataType::BT_STRUCT)
-        {
-            return transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
-        }
-        else if (field.type.id == bond::BondDataType::BT_LIST || field.type.id == bond::BondDataType::BT_SET || field.type.id == bond::BondDataType::BT_MAP)
-        {
-            return transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
-        }
-        else
-        {
-            return detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
-        }
-    }
 
     template <typename Transform>
     bool
@@ -288,23 +263,75 @@ protected:
     using detail::ParserInheritance<Input, DynamicParser<Input> >::_base;
 
 
-private:      
-    template <typename Fields, typename Transform>
-    bool 
-    ReadFields(const Fields& fields, const Transform& transform)
+private:
+    uint16_t     _id = invalid_field_id;
+    BondDataType _type;
+
+    template <typename Transform>
+    void
+    BeginFields(const Transform&)
     {
-        uint16_t     id;
-        BondDataType type;
+        // Read the first type/ID, and begin processing.
+        _input.ReadFieldBegin(_type, _id);
+    }
 
-        _input.ReadFieldBegin(type, id);
+    template <typename t_field, typename Transform>
+    bool 
+    ReadOneField(const t_field& field, const Transform& transform)
+    {
+        for (;;)
+        {
+            if (t_field::id == _id && get_type_id<typename t_field::field_type>::value == _type)
+            {
+                // Exact match
+                NextField(field, transform);
+            }
+            else if (t_field::id >= _id && _type != bond::BondDataType::BT_STOP && _type != bond::BondDataType::BT_STOP_BASE)
+            {
+                // Unknown field or non-exact type match
+                UnknownFieldOrTypeMismatch(field, _id, _type, transform);
+            }
+            else
+            {
+                OmittedField(field, transform);
+                return false; // retry with the next field in the struct.
+            }
 
-        ReadFields(fields, id, type, transform);
+            _input.ReadFieldEnd();
+            _input.ReadFieldBegin(_type, _id);
+
+            if (t_field::id < _id || _type == bond::BondDataType::BT_STOP || _type == bond::BondDataType::BT_STOP_BASE)
+            {
+                return false;
+            }
+        }
+    }
+
+    
+    // use compile-time schema
+    template <typename TField, typename Transform>
+    bool
+    ReadOneField(const TField&, uint16_t& id, BondDataType& type, const Transform& transform)
+    {
+        return false;
+    }
+
+    template <typename Transform>
+    void
+    EndFields(const Transform& transform)
+    {
+        // Read any data past the last known field to the end of the struct or the end of the current base-class.
+        for (; _type != bond::BondDataType::BT_STOP && _type != bond::BondDataType::BT_STOP_BASE;
+        _input.ReadFieldEnd(), _input.ReadFieldBegin(_type, _id))
+        {
+            UnknownField(_id, _type, transform);
+        }
 
         if (!_base)
         {
             // If we are not parsing a base class, and we still didn't get to
             // the end of the struct, it means that:
-            // 
+            //
             // 1) Actual data in the payload had deeper hierarchy than payload schema.
             //
             // or
@@ -313,69 +340,18 @@ private:
             //    the transform "expected".
             //
             // In both cases we emit remaining fields as unknown
-            
-            for (; type != bond::BondDataType::BT_STOP; _input.ReadFieldEnd(), _input.ReadFieldBegin(type, id))
+
+            for (; _type != bond::BondDataType::BT_STOP; _input.ReadFieldEnd(), _input.ReadFieldBegin(_type, _id))
             {
-                if (type == bond::BondDataType::BT_STOP_BASE)
+                if (_type == bond::BondDataType::BT_STOP_BASE)
                     transform.UnknownEnd();
                 else
-                    UnknownField(id, type, transform);
+                    UnknownField(_id, _type, transform);
             }
         }
 
         _input.ReadFieldEnd();
-
-        return false;
     }
-
-    
-    // use compile-time schema
-    template <typename Fields, typename Transform>
-    void
-    ReadFields(const Fields&, uint16_t& id, BondDataType& type, const Transform& transform)
-    {
-        typedef typename boost::mpl::deref<Fields>::type Head;
-
-        for (;;)
-        {
-            if (Head::id == id && get_type_id<typename Head::field_type>::value == type)
-            {
-                // Exact match
-                NextField(Head(), transform);
-            }
-            else if (Head::id >= id && type != bond::BondDataType::BT_STOP && type != bond::BondDataType::BT_STOP_BASE)
-            {
-                // Unknown field or non-exact type match
-                UnknownFieldOrTypeMismatch(Head(), id, type, transform);
-            }
-            else
-            {
-                OmittedField(Head(), transform);
-                goto NextSchemaField;
-            }
-
-            _input.ReadFieldEnd();
-            _input.ReadFieldBegin(type, id);
-
-            if (Head::id < id || type == bond::BondDataType::BT_STOP || type == bond::BondDataType::BT_STOP_BASE)
-            {
-                NextSchemaField: return ReadFields(typename boost::mpl::next<Fields>::type(), id, type, transform);
-            }
-        }
-    }
-
-
-    template <typename Transform>
-    void
-    ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, uint16_t& id, BondDataType& type, const Transform& transform)
-    {
-        for (; type != bond::BondDataType::BT_STOP && type != bond::BondDataType::BT_STOP_BASE;
-               _input.ReadFieldEnd(), _input.ReadFieldBegin(type, id))
-        {
-            UnknownField(id, type, transform);
-        }
-    }
-
  
     template <typename T, typename Transform>
     typename boost::enable_if_c<is_nested_field<T>::value
@@ -414,7 +390,7 @@ private:
 
 
     // This function is called only when payload has unknown field id or type is not
-    // matching exactly. This relativly rare so we don't inline the function to help 
+    // matching exactly. This relatively rare so we don't inline the function to help
     // the compiler to optimize the common path. 
     template <typename T, typename Transform>
     BOND_NO_INLINE
@@ -558,7 +534,7 @@ private:
 
 // DOM parser works with protocol implementations using Document Object Model, 
 // e.g. JSON or XML. The parser assumes that fields in DOM are unordered and 
-// are identified by either ordinal or metadata. DOM based protocols may loosly
+// are identified by either ordinal or metadata. DOM based protocols may loosely
 // map to Bond meta-schema types thus the parser delegates to the protocol for 
 // field type match checking. 
 template <typename Input>
@@ -588,35 +564,32 @@ protected:
     using detail::ParserInheritance<Input, DOMParser<Input> >::_base;
 
 private:
-    template <typename Fields>
-    void SkipFields(const Fields&)
+    // use compile-time schema
+    template <typename TField>
+    void SkipOneField(const TField&)
     {}
 
-    // use compile-time schema
-    template <typename Fields, typename Transform>
-    bool ReadFields(const Fields&, const Transform& transform)
-    {
-        typedef typename boost::mpl::deref<Fields>::type Head;
+    template<typename Transform>
+    void BeginFields(const Transform&) {}
 
+    template<typename TField, typename Transform>
+    bool ReadOneField(const TField&, const Transform& transform)
+    {
         if (const typename Reader::Field* field = _input.FindField(
-                Head::id,  
-                Head::metadata, 
-                get_type_id<typename Head::field_type>::value,
-                is_enum<typename Head::field_type>::value))
+                TField::id,
+                TField::metadata,
+                get_type_id<typename TField::field_type>::value,
+                is_enum<typename TField::field_type>::value))
         {
             Reader input(_input, *field);
-            NextField(Head(), transform, input);
+            NextField(TField(), transform, input);
         }
-        
-        return ReadFields(typename boost::mpl::next<Fields>::type(), transform);
-    }
 
-    template <typename Transform>
-    bool ReadFields(const boost::mpl::l_iter<boost::mpl::l_end>&, const Transform&)
-    {
         return false;
     }
 
+    template<typename Transform>
+    void EndFields(const Transform&) {}
 
     template <typename T, typename Transform>
     typename boost::enable_if_c<is_nested_field<T>::value
@@ -655,6 +628,10 @@ private:
 
 
     // use runtime schema
+    template <typename Fields>
+    void SkipFields(const Fields&)
+    {}
+
     template <typename Transform>
     bool ReadFields(const RuntimeSchema& schema, const Transform& transform)
     {
