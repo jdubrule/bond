@@ -413,6 +413,7 @@ namespace detail
     };
 }
 
+
 template<typename t_schema, typename Predicate = detail::true_predicate_type, typename F>
 inline
 void for_each_field(F f)

@@ -431,7 +431,7 @@ schema<Unknown, Unused>
     struct type
     {
         typedef no_base base;
-#if defined(BOND_ENABLE_PRECXX11_MPL_SCHEMAS)
+#ifdef BOND_ENABLE_PRECXX11_MPL_SCHEMAS
         typedef boost::mpl::list<>::type fields;
 #endif
 

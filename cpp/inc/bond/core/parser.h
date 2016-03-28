@@ -28,10 +28,12 @@ protected:
     {
     }
 
+
     template <typename TField>
     void SkipOneField(const TField&)
     {
     }
+
 
     template <typename T, typename Transform>
     typename boost::disable_if<is_fast_path_field<T, Transform>, bool>::type
@@ -47,6 +49,7 @@ protected:
     {
         return transform.OmittedField(field);
     }
+
 
     template <typename Transform>
     struct UnknownFieldBinder
@@ -64,6 +67,7 @@ protected:
 
         Transform& transform;
     };
+
 
     template <typename Transform>
     UnknownFieldBinder<Transform> BindUnknownField(Transform& transform)
@@ -135,6 +139,7 @@ private:
 
         return false; // Don't skip fields
     }
+    
 
 
     template <typename Transform>
@@ -196,7 +201,9 @@ private:
 
     bool
     ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
-    {}
+    {
+    }
+
 
     template<typename Transform>
     bool
@@ -221,6 +228,7 @@ private:
             return detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
         }
     }
+	
 
 
     template <typename Transform>
@@ -300,6 +308,7 @@ private:
         _input.ReadFieldBegin(_type, _id);
     }
 
+
     template <typename t_field, typename Transform>
     bool 
     ReadOneField(const t_field& field, const Transform& transform)
@@ -332,7 +341,7 @@ private:
         }
     }
 
-    
+
     // use compile-time schema
     template <typename TField, typename Transform>
     bool
@@ -377,6 +386,7 @@ private:
 
         _input.ReadFieldEnd();
     }
+
  
     template <typename T, typename Transform>
     typename boost::enable_if_c<is_nested_field<T>::value
@@ -592,7 +602,9 @@ private:
     // use compile-time schema
     template <typename TField>
     void SkipOneField(const TField&)
-    {}
+    {
+    }
+
 
     template<typename Transform>
     void BeginFields(const Transform&) {}
@@ -613,8 +625,12 @@ private:
         return false;
     }
 
+
     template<typename Transform>
-    void EndFields(const Transform&) {}
+    void EndFields(const Transform&)
+    {
+    }
+
 
     template <typename T, typename Transform>
     typename boost::enable_if_c<is_nested_field<T>::value
@@ -655,7 +671,9 @@ private:
     // use runtime schema
     template <typename Fields>
     void SkipFields(const Fields&)
-    {}
+    {
+    }
+
 
     template <typename Transform>
     bool ReadFields(const RuntimeSchema& schema, const Transform& transform)
@@ -682,6 +700,5 @@ private:
         return done;
     }
 };
-
 
 } // namespace bond
