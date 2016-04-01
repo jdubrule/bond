@@ -527,6 +527,7 @@ public:
         return AssignToBase(_var, value);
     }
 
+
     // Separate Field overloads for bonded<T>, basic types and containers allows us to use
     // simpler predicates. This doesn't matter for runtime code but
     // compiles significantly faster.
@@ -693,6 +694,7 @@ protected:
             return false;
     }
 
+
 #if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
     template <typename V, typename X>
     bool AssignToNested(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
@@ -701,20 +703,21 @@ protected:
     }
 #endif
 
+
     template <typename BaseT, typename V, typename X>    
     bool AssignToBase(const BaseT*, V& var, const PathView& ids, const X& value) const
     {
         return Assign(static_cast<BaseT&>(var), PathView(ids.path, ids.current + 1), value);
     }
 
-    
+
     template <typename V, typename X>    
     bool AssignToBase(const no_base*, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
     {
         return false;
     }
 
-    
+
     // Separate AssignToField overloads for bonded<T>, basic types and containers allows us 
     // to use simpler predicates in boost::mpl::copy_if. This doesn't matter for runtime code
     // but compiles significantly faster.
@@ -728,7 +731,7 @@ protected:
         });
     }
 
-    
+
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {

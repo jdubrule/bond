@@ -296,11 +296,13 @@ field_id
     static const uint16_t value = boost::mpl::deref<Iter>::type::id;
 };
 
+
 template <typename T> struct 
 field_id<T, typename boost::mpl::end<T>::type>
 {
     static const uint16_t value = invalid_field_id;
 };
+
 
 template <typename T, uint16_t minId = 0> struct 
 next_required_field

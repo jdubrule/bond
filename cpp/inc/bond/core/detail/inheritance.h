@@ -84,20 +84,20 @@ struct FieldIterate;
 template<typename C, typename TSchema, size_t... S>
 struct FieldIterate<C, TSchema, std::index_sequence<S...>>
 {
-	static bool DoFieldIterate(const C &caller)
-	{
-		caller.BeginFields();
+    static bool DoFieldIterate(const C &caller)
+    {
+        caller.BeginFields();
 
-		bool done = false;
-		auto runThese = {
-			false,
-			done = !done && caller.DoField<TSchema::field<S>::type>()...
-		};
+        bool done = false;
+        auto runThese = {
+            false,
+            done = !done && caller.DoField<TSchema::field<S>::type>()...
+        };
 
-		caller.EndFields();
+        caller.EndFields();
 
-		return done;
-	}
+        return done;
+    }
 };
 
 template<typename C, typename TSchema, typename Seq = std::make_index_sequence<TSchema::fieldCount>>

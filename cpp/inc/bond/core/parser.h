@@ -137,9 +137,9 @@ private:
         else
             NextField(t_field(), transform);
 
-        return false; // Don't skip fields
+        return false; // don't skip fields
     }
-    
+
 
 
     template <typename Transform>
@@ -228,7 +228,94 @@ private:
             return detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
         }
     }
-	
+    
+
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
+    {}
+
+
+    template<typename Transform>
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform &transform, const FieldDef &field)
+    {
+        if (detail::ReadFieldOmitted(_input))
+        {
+            transform.OmittedField(field.id, field.metadata, field.type.id);
+            return false;
+        }
+
+        if (field.type.id == bond::BT_STRUCT)
+        {
+            return transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else if (field.type.id == bond::BT_LIST || field.type.id == bond::BT_SET || field.type.id == bond::BT_MAP)
+        {
+            return transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else
+        {
+            return detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
+        }
+    }
+
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
+    {}
+
+
+    template<typename Transform>
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform &transform, const FieldDef &field)
+    {
+        if (detail::ReadFieldOmitted(_input))
+        {
+            transform.OmittedField(field.id, field.metadata, field.type.id);
+            return false;
+        }
+
+        if (field.type.id == bond::BT_STRUCT)
+        {
+            return transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else if (field.type.id == bond::BT_LIST || field.type.id == bond::BT_SET || field.type.id == bond::BT_MAP)
+        {
+            return transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else
+        {
+            return detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
+        }
+    }
+
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
+    {}
+
+
+    template<typename Transform>
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform &transform, const FieldDef &field)
+    {
+        if (detail::ReadFieldOmitted(_input))
+        {
+            transform.OmittedField(field.id, field.metadata, field.type.id);
+            return false;
+        }
+
+        if (field.type.id == bond::BT_STRUCT)
+        {
+            return transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else if (field.type.id == bond::BT_LIST || field.type.id == bond::BT_SET || field.type.id == bond::BT_MAP)
+        {
+            return transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else
+        {
+            return detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
+        }
+    }
 
 
     template <typename Transform>
@@ -254,6 +341,8 @@ private:
 
         return done;
     }
+
+
 };
 
 

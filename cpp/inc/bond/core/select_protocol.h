@@ -192,7 +192,6 @@ inline bool NextProtocol(
 }
 #else
 
-
 template<typename Buffer, typename Protocols = Protocols<Buffer>::type>
 struct DoProtocolApply;
 
@@ -273,6 +272,7 @@ inline bool ApplyMatchingProtocol(
 #endif
 }
 
+
 template <typename Buffer, typename Transform>
 inline bool ApplyMatchingProtocol(
     const Transform& transform,
@@ -296,6 +296,7 @@ inline bool ApplyMatchingProtocol(
     });
 #endif
 }
+
 
 template <template <typename Writer> class Transform, typename Buffer, typename T>
 inline bool ApplyMatchingProtocol(
@@ -420,4 +421,3 @@ inline bool Apply(const T& value, Buffer& output, uint16_t protocol)
 }
 
 } // namespace bond
-
