@@ -16,6 +16,10 @@ is_protocol_enabled
 
 struct protocols;
 
+#if !defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+template<typename... Protocol> struct ProtocolList;
+#endif
+
 // User can modify set of protocols by specializing customize<protocols>
 template <typename> struct
 customize

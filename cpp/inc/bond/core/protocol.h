@@ -6,6 +6,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/variant.hpp>
 #include <boost/ref.hpp>
+
 #include <boost/mpl/list.hpp>
 #include <boost/mpl/push_front.hpp>
 #include <boost/mpl/copy_if.hpp>
@@ -144,27 +145,65 @@ struct ValueReader
     const void* pointer;
 };
 
+//////////////////////////////////////////////////////////////////////////
+// Protocol List:
+//////////////////////////////////////////////////////////////////////////
 
-using boost::mpl::_;
+template<typename... Protocol> struct ProtocolList {};
+
+// Internals:
+template<typename TAddOn, typename TList> struct ProtocolListPushFront;
+template<typename TAddOn, typename... S>
+struct ProtocolListPushFront<TAddOn, ProtocolList<S...>>
+{
+    using type = ProtocolList<typename TAddOn, S...>;
+};
+
+template<typename TProtocolList> struct ProtocolListEnabledFilter;
+
+template<typename T, typename... S> struct ProtocolListEnabledFilter<ProtocolList<T, S...>>
+{
+    using type = std::conditional_t<is_protocol_enabled<T>::value,
+        typename ProtocolListPushFront<T, typename ProtocolListEnabledFilter<ProtocolList<S...>>::type>::type,
+        typename ProtocolListEnabledFilter<ProtocolList<S...>>::type>;
+};
+
+template<typename T> struct ProtocolListEnabledFilter<ProtocolList<T>>
+{
+    using type = std::conditional_t < is_protocol_enabled<T>::value,
+        ProtocolList<T>,
+        ProtocolList < >> ;
+};
+
+template<typename TProtocolList> struct ProtocolVariant;
+template<typename... TProtocol> struct ProtocolVariant<ProtocolList<TProtocol...>>
+{
+    using type = boost::variant<TProtocol...>;
+};
+
+template<typename TProtocolList> struct ProtocolBoostList;
+template<typename... TProtocol> struct ProtocolBoostList<ProtocolList<TProtocol...>>
+{
+    using type = boost::mpl::list<TProtocol...>;
+};
+
 
 template <typename Buffer>
 struct Protocols
 {
-    typedef typename boost::mpl::list<
+    using built_in = ProtocolList<
        CompactBinaryReader<Buffer>,
        SimpleBinaryReader<Buffer>,
        FastBinaryReader<Buffer>,
        SimpleJsonReader<Buffer>
-    >::type built_in;
+    >;
 
     typedef typename customize<protocols>::modify<built_in>::type all;
-    
-    typedef typename boost::mpl::copy_if<
-        all, 
-        is_protocol_enabled<_>, 
-        boost::mpl::front_inserter<boost::mpl::list<> > >::type type;
 
-    typedef typename boost::mpl::begin<type>::type begin;
+    using type = typename ProtocolListEnabledFilter<built_in>::type;
+
+    using mplType = typename ProtocolBoostList<type>::type;
+    using begin = typename boost::mpl::begin<mplType>::type;
 };
 
 
@@ -199,12 +238,9 @@ struct ProtocolReader
         return value == rhs.value;
     }
     
-    typename boost::make_variant_over<
-        typename boost::mpl::push_front<
-            typename Protocols<Buffer>::all, 
-            ValueReader
-        >::type
-    >::type value;
+    using valueTypes = typename ProtocolListPushFront<ValueReader, typename Protocols<Buffer>::all>::type;
+
+    typename ProtocolVariant<valueTypes>::type value;
 };
 
 

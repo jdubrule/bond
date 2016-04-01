@@ -4,12 +4,17 @@
 #pragma once
 
 #include <boost/static_assert.hpp>
+
+#include <bond/core/config.h>
+#if defined(BOND_ENABLE_PRECXX11_MPL_SCHEMAS)
 #include <boost/mpl/transform.hpp>
 #include <boost/mpl/find_if.hpp>
 #include <boost/mpl/for_each.hpp>
 #include <boost/mpl/list.hpp>
 #include <boost/mpl/push_front.hpp>
 #include <boost/mpl/copy_if.hpp>
+#endif
+
 #include <boost/assign.hpp>
 #include <boost/assign/list_of.hpp>
 
@@ -20,7 +25,9 @@
 namespace bond
 {
 
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
 using boost::mpl::_;
+#endif
 
 template <typename T> struct 
 remove_maybe
@@ -79,6 +86,8 @@ template
 >
 struct FieldTemplate
 {
+    static constexpr bool is_nested_field() { return is_bond_type<field_type>::value; }
+
     /// @brief Type of the field's parent struct
     typedef t_struct struct_type;
 
@@ -230,6 +239,7 @@ bond::Metadata MetadataInit(const char* name, const char* qualified_name, const 
 
 
 // Metadata initializer for generic structs
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
 template <typename Params>
 bond::Metadata MetadataInit(const char* name, const char* qualified_name, const Attributes& attributes)
 {
@@ -249,24 +259,35 @@ bond::Metadata MetadataInit(const char* name, const char* qualified_name, const 
 
     return metadata;
 }
+#else
 
+template<typename... Params>
+bond::Metadata MetadataInit(const char* name, const char* qualified_name, const Attributes& attributes)
+{
+    bond::Metadata metadata = MetadataInit(name, qualified_name, attributes);
+
+    std::string params;
+    detail::TypeListBuilder typeListBuilder(params);
+
+    auto doThese =
+    {
+        0,
+        ((void)typeListBuilder((Params*)nullptr),0)...
+    };
+
+    metadata.name += "<" + params + ">";
+    metadata.qualified_name += "<" + params + ">";
+
+    return metadata;
+}
+#endif
 
 } // namespace reflection
 
 
 const reflection::nothing nothing = {};
 
-template <typename T, typename Iter> struct 
-field_id
-{
-    static const uint16_t value = boost::mpl::deref<Iter>::type::id;
-};
-
-template <typename T> struct 
-field_id<T, typename boost::mpl::end<T>::type>
-{
-    static const uint16_t value = invalid_field_id;
-};
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
 
 template <typename T, uint16_t minId = 0> struct 
 next_required_field
@@ -283,6 +304,66 @@ public:
     static const uint16_t value = field_id<T, typename boost::mpl::find_if<T, is_next_required<_> >::type>::value;
 };
 
+#else
+
+namespace detail
+{
+    template<typename t_Schema, typename t_currentFieldIndex, uint16_t minId>
+    struct next_required_field_helper
+    {
+    private:
+        static const uint16_t currentFieldId = t_Schema::field<t_currentFieldIndex::value>::type::id;
+        static const bool currentFieldIsRequired = std::is_same<t_Schema::field<t_currentFieldIndex::value>::type::field_modifier, reflection::required_field_modifier>::value;
+
+	public:
+		static const uint16_t value = currentFieldId >= minId && currentFieldIsRequired ?
+            currentFieldId
+			: next_required_field_helper<t_Schema, std::integral_constant<size_t, t_currentFieldIndex::value + 1>, minId>::value;
+    };
+
+    template<typename t_Schema, uint16_t minId>
+    struct next_required_field_helper<t_Schema, typename t_Schema::fieldCount, minId>:
+        std::integral_constant<uint16_t, invalid_field_id>
+    {};
+}
+
+template<typename TField, uint16_t minId = 0>
+struct next_required_field
+{
+private:
+    typedef typename schema<typename TField::struct_type>::type t_Schema;
+
+public:
+
+    static const uint16_t value = detail::next_required_field_helper<t_Schema, t_Schema::fieldIndex<TField>, minId>::value;
+};
+
+#endif
+
+template<typename T>
+struct is_empty_struct :
+    std::integral_constant<bool, schema<T>::type::fieldCount::value == 0>
+{};
+
+template<bool ...Tail>
+struct are_all_true : std::true_type {};
+
+template<bool Head, bool ...Tail>
+struct are_all_true<Head, Tail...>
+{
+    static const bool value = Head && are_all_true<Tail...>::value;
+};
+
+template<typename t_Schema, size_t t_fieldToStartAt = 0, typename Seq = std::make_index_sequence<t_Schema::fieldCount::value - t_fieldToStartAt>>
+struct any_required_fields;
+
+template<typename t_Schema, size_t t_fieldToStartAt, size_t... S>
+struct any_required_fields<t_Schema, t_fieldToStartAt, std::index_sequence<S...>>
+{
+    static const bool value = !are_all_true<
+        !std::is_same<typename t_Schema::field<S + t_fieldToStartAt>::type::field_modifier, reflection::required_field_modifier>::value...
+    >::value;
+};
 
 struct no_base {};
 
@@ -392,7 +473,6 @@ is_fast_path_field<Field, Transform, typename boost::enable_if<is_same<typename 
 template <typename T> struct 
 is_nested_field
     : is_bond_type<typename T::field_type> {}; 
-
 
 template <typename T> struct 
 is_struct_field
@@ -622,11 +702,16 @@ template <typename T> struct
 is_container_field
     : is_container<typename T::field_type> {};
 
-
 template <typename T, typename F> struct 
 is_matching_basic_field
     : is_matching_basic<T, typename F::field_type> {};
 
+template<typename T, typename F, typename Enabled = void>
+struct is_matching_field : is_matching_basic_field<T, F>
+{};
+
+template<typename T, typename F> struct
+is_matching_field<T, F, typename std::enable_if<is_container_field<F>::value>::type> : is_matching_container_field<T, F> {};
 
 template <typename T, typename Reader> struct 
 is_basic_type<value<T, Reader> > 
@@ -637,6 +722,7 @@ template <typename T1, typename T2> struct
 is_basic_type<std::pair<T1, T2> > 
     : false_type {};
 
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
 
 template <typename T, typename X, typename Enable = void> struct 
 matching_fields
@@ -674,7 +760,7 @@ container_fields
     : boost::mpl::copy_if<typename schema<T>::type::fields, 
                           is_container_field<_>, 
                           boost::mpl::front_inserter<boost::mpl::list<> > > {};
-
+#endif
 
 template <typename T> struct 
 has_base
@@ -781,35 +867,35 @@ get_type_id
 template <typename T> 
 const BondDataType get_type_id<T>::value;
 
-class PrimitiveTypes
-{
-    struct Init
-    {
-        Init(uint32_t* _sizeof)
-            : _sizeof(_sizeof)
-        {}
-
-        template <typename T>
-        void operator()(const T&)
-        {
-            _sizeof[get_type_id<T>::value] = sizeof(T);
-        }
-
-        uint32_t* _sizeof;
-    };
-
-public:
-    typedef boost::mpl::list
-    <
-        bool, float, double,
-        uint8_t, uint16_t, uint32_t, uint64_t, 
-        int8_t,  int16_t,  int32_t,  int64_t
-    >type;
-    
-    PrimitiveTypes(uint32_t* _sizeof)
-    {
-        boost::mpl::for_each<type>(Init(_sizeof));
-    }
-};
+// class PrimitiveTypes
+// {
+//     struct Init
+//     {
+//         Init(uint32_t* _sizeof)
+//             : _sizeof(_sizeof)
+//         {}
+//
+//         template <typename T>
+//         void operator()(const T&)
+//         {
+//             _sizeof[get_type_id<T>::value] = sizeof(T);
+//         }
+//
+//         uint32_t* _sizeof;
+//     };
+//
+// public:
+//     typedef boost::mpl::list
+//     <
+//         bool, float, double,
+//         uint8_t, uint16_t, uint32_t, uint64_t,
+//         int8_t,  int16_t,  int32_t,  int64_t
+//     >type;
+//
+//     PrimitiveTypes(uint32_t* _sizeof)
+//     {
+//         boost::mpl::for_each<type>(Init(_sizeof));
+//     }
+// };
 
 } // namespace bond

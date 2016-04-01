@@ -331,32 +331,39 @@ Marshaler<Writer> MarshalTo(Writer& output)
     return Marshaler<Writer>(output);
 }
 
-
 template <typename T>
-class RequiredFieldValiadator
+class RequiredFieldValidator
 {
 protected:
-    void Begin() const
+
+    template<typename TT = T>
+    typename boost::enable_if<is_empty_struct<TT>>::type
+    Begin() const
     {
-        _required = next_required_field<typename schema<T>::type::fields>::value;
     }
-        
+
+    template<typename TT = T>
+    typename boost::disable_if<is_empty_struct<TT>>::type
+        Begin() const
+    {
+        _required = next_required_field<typename schema<T>::type::field<0>::type>::value;
+    }
+
     template <typename Head>
-    typename boost::enable_if<is_same<typename Head::field_modifier, 
-                                      reflection::required_field_modifier> >::type
-    Validate() const
+    typename boost::enable_if<is_same<typename Head::field_modifier,
+        reflection::required_field_modifier> >::type
+        Validate() const
     {
         if (_required == Head::id)
-            _required = next_required_field<typename schema<T>::type::fields, Head::id + 1>::value;
+            _required = next_required_field<typename schema<T>::type::field<0>::type, Head::id + 1>::value;
         else
             MissingFieldException();
     }
 
 
     template <typename Schema>
-    typename boost::enable_if_c<next_required_field<typename Schema::fields>::value 
-                             != invalid_field_id>::type
-    Validate() const
+    typename boost::enable_if_c<any_required_fields<Schema>::value>::type
+        Validate() const
     {
         if (_required != invalid_field_id)
             MissingFieldException();
@@ -364,31 +371,27 @@ protected:
 
 
     template <typename Head>
-    typename boost::disable_if<is_same<typename Head::field_modifier, 
-                                       reflection::required_field_modifier> >::type
-    Validate() const
+    typename boost::disable_if<is_same<typename Head::field_modifier,
+        reflection::required_field_modifier> >::type
+        Validate() const
     {}
 
 
     template <typename Schema>
-    typename boost::disable_if_c<next_required_field<typename Schema::fields>::value 
-                              != invalid_field_id>::type
-    Validate() const
+    typename boost::disable_if_c<any_required_fields<Schema>::value>::type
+        Validate() const
     {}
 
 private:
-    void MissingFieldException() const;
-    
+    void MissingFieldException() const
+    {
+        BOND_THROW(CoreException,
+            "De-serialization failed: required field " << _required <<
+            " is missing from " << schema<T>::type::metadata.qualified_name);
+    }
+
     mutable uint16_t _required;
 };
-
-template <typename T>
-void RequiredFieldValiadator<T>::MissingFieldException() const
-{
-    BOND_THROW(CoreException,
-          "De-serialization failed: required field " << _required <<
-          " is missing from " << schema<T>::type::metadata.qualified_name);
-}
 
 //
 // To<T> transforms the input field-by-field, matching both field ids and types,
@@ -435,13 +438,75 @@ protected:
     {
         return false;
     }
+};
 
-    template <typename X>
-    bool AssignToField(const boost::mpl::l_iter<boost::mpl::l_end>&, uint16_t /*id*/, const X& /*value*/) const
+template<typename TField, typename Pred, bool Go = Pred::type<TField>::value>
+struct DoIf {
+    template<typename Func>
+    static bool DoIt(const Func &)
     {
         return false;
     }
 };
+
+template<typename TField, typename Pred>
+struct DoIf<TField, Pred, true>
+{
+    template<typename Func>
+    static bool DoIt(const Func & f)
+    {
+        return f(TField());
+    }
+};
+
+template<typename T, typename Pred, typename Seq = std::make_index_sequence<schema<T>::type::fieldCount::value>>
+struct AssignToFirstMatching;
+
+template<typename T, typename Pred, size_t... S>
+struct AssignToFirstMatching<T, Pred, std::index_sequence<S...>>
+{
+    template<typename Func>
+    bool operator()(const Func& f) const
+    {
+        (f);
+
+        bool done = false;
+        auto doThese =
+        {
+            false,
+            done = !done && DoIf<schema<T>::type::field<S>::type, Pred>::DoIt(f)...
+        };
+
+        return done;
+    }
+};
+
+
+struct nested_predicate
+{
+    template<typename T>
+    using type = is_nested_field<T>;
+};
+
+struct container_predicate
+{
+    template<typename T>
+    using type = is_container_field<T>;
+};
+
+template<typename X>
+struct matching_predicate
+{
+    template<typename T>
+    using type = is_matching_field<X, T>;
+};
+
+struct struct_predicate
+{
+    template<typename T>
+    using type = is_struct_field<T>;
+};
+
 
 } // namespace detail
 
@@ -481,28 +546,36 @@ public:
         return AssignToBase(_var, value);
     }
 
-
     // Separate Field overloads for bonded<T>, basic types and containers allows us to use
-    // simpler predicates in boost::mpl::copy_if. This doesn't matter for runtime code but
+    // simpler predicates. This doesn't matter for runtime code but
     // compiles significantly faster.
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename nested_fields<T>::type>::type(), id, value);
+        return detail::AssignToFirstMatching<T, detail::nested_predicate>()([this, &id, &value](const auto &fieldType)
+        {
+            return AssignToField(fieldType, id, value);
+        });
     }
 
 
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename matching_fields<T, X>::type>::type(), id, value);
+        return detail::AssignToFirstMatching<T, detail::matching_predicate<X>>()([this, &id, &value](const auto &fieldType)
+        {
+            return AssignToField(fieldType, id, value);
+        });
     }
 
 
     template <typename Reader>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename container_fields<T>::type>::type(), id, value);
+        return detail::AssignToFirstMatching<T, detail::container_predicate>()([this, &id, &value](const auto &fieldType)
+        {
+            return AssignToField(fieldType, id, value);
+        });
     }
 
 
@@ -520,23 +593,17 @@ public:
 
 private:
     using detail::To::AssignToBase;
-    using detail::To::AssignToField;
 
-    template <typename Fields, typename X>
-    bool AssignToField(const Fields&, uint16_t id, const X& value) const
+    template <typename TField, typename X>
+    bool AssignToField(const TField&, uint16_t id, const X& value) const
     {
-        typedef typename boost::mpl::deref<Fields>::type Head;
-
-        if (id == Head::id)
+        if (id == TField::id)
         {
-            Validator::template Validate<Head>();
-            AssignToVar(Head::GetVariable(_var), value);
-            return false;
+            Validator::template Validate<TField>();
+            AssignToVar(TField::GetVariable(_var), value);
+            return true;
         }
-        else
-        {
-            return AssignToField(typename boost::mpl::next<Fields>::type(), id, value);
-        }
+        return false;
     }
 
 private:
@@ -626,9 +693,29 @@ protected:
     template <typename V, typename X>
     bool AssignToNested(V& var, const PathView& ids, const X& value) const
     {
-        return AssignToNested(typename boost::mpl::begin<typename struct_fields<V>::type>::type(), var, ids, value);
+        return detail::AssignToFirstMatching<V, detail::struct_predicate>()([this, &var, &ids, &value](const auto &fieldType)
+        {
+            return AssignToNested(fieldType, var, ids, value);
+        });
     }
 
+
+    template <typename NestedField, typename V, typename X>
+    bool AssignToNested(const NestedField&, V& var, const PathView& ids, const X& value) const
+    {
+        if (*ids.current == NestedField::id)
+            return Assign(NestedField::GetVariable(var), PathView(ids.path, ids.current + 1), value);
+        else
+            return false;
+    }
+
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+    template <typename V, typename X>
+    bool AssignToNested(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
+    {
+        return false;
+    }
+#endif
 
     template <typename BaseT, typename V, typename X>    
     bool AssignToBase(const BaseT*, V& var, const PathView& ids, const X& value) const
@@ -643,24 +730,6 @@ protected:
         return false;
     }
 
-
-    template <typename Nested, typename V, typename X>
-    bool AssignToNested(const Nested&, V& var, const PathView& ids, const X& value) const
-    {
-        typedef typename boost::mpl::deref<Nested>::type Head;
-
-        if (*ids.current == Head::id)
-            return Assign(Head::GetVariable(var), PathView(ids.path, ids.current + 1), value);
-        else
-            return AssignToNested(typename boost::mpl::next<Nested>::type(), var, ids, value);
-    }
-
-    template <typename V, typename X>
-    bool AssignToNested(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
-    {
-        return false;
-    }
-
     
     // Separate AssignToField overloads for bonded<T>, basic types and containers allows us 
     // to use simpler predicates in boost::mpl::copy_if. This doesn't matter for runtime code
@@ -668,47 +737,46 @@ protected:
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename nested_fields<V>::type>::type(), var, id, value);
+        return detail::AssignToFirstMatching<V, detail::nested_predicate>()([this, &var, &id, &value](const auto &fieldType)
+        {
+            return AssignToField(fieldType, var, id, value);
+        });
     }
 
     
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename matching_fields<V, X>::type>::type(), var, id, value);
+        return detail::AssignToFirstMatching<V, detail::matching_predicate<X>>()([this, &var, &id, &value](const auto &fieldType)
+        {
+            return AssignToField(fieldType, var, id, value);
+        });
     }
 
 
     template <typename Reader, typename V>
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename container_fields<V>::type>::type(), var, id, value);
+        return detail::AssignToFirstMatching<V, detail::container_predicate>()([this, &var, &id, &value](const auto &fieldType)
+        {
+            return AssignToField(fieldType, var, id, value);
+        });
     }
 
     
-    template <typename Fields, typename V, typename X>
-    bool AssignToField(const Fields&, V& var, uint16_t id, const X& value) const
+    template <typename Field, typename V, typename X>
+    bool AssignToField(const Field&, V& var, uint16_t id, const X& value) const
     {
-        typedef typename boost::mpl::deref<Fields>::type Head;
-
-        if (id == Head::id)
+        if (id == Field::id)
         {
-            AssignToVar(Head::GetVariable(var), value);
-            return false;
+            AssignToVar(Field::GetVariable(var), value);
+            return true;
         }
         else
         {
-            return AssignToField(typename boost::mpl::next<Fields>::type(), var, id, value);
+            return false;
         }
     }
-
-    
-    template <typename V, typename X>
-    bool AssignToField(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, uint16_t /*id*/, const X& /*value*/) const
-    {
-        return false;
-    }
-
 
     template <typename V, typename X>
     void AssignToVar(V& var, const X& value) const

@@ -129,9 +129,11 @@ private:
     ReadOneField(const t_field&, const Transform& transform)
     {
         if (detail::ReadFieldOmitted(_input))
-            return OmittedField(t_field(), transform);
+            OmittedField(t_field(), transform);
         else
-            return NextField(t_field(), transform);
+            NextField(t_field(), transform);
+
+        return false; // Don't skip fields
     }
 
     template <typename Transform>
@@ -139,6 +141,7 @@ private:
     EndFields(const Transform&)
     {
     }
+
     template <typename T, typename Transform>
     typename boost::enable_if_c<detail::is_reader<Input>::value && !is_nested_field<T>::value
                              && !is_fast_path_field<T, Transform>::value, bool>::type
@@ -189,38 +192,61 @@ private:
     }
 
 
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
+    {}
+
+
+    template<typename Transform>
+    bool
+    ReadRuntimeField(const RuntimeSchema& schema, const Transform &transform, const FieldDef &field)
+    {
+        if (detail::ReadFieldOmitted(_input))
+        {
+            transform.OmittedField(field.id, field.metadata, field.type.id);
+            return false;
+        }
+
+        if (field.type.id == bond::BT_STRUCT)
+        {
+            return transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else if (field.type.id == bond::BT_LIST || field.type.id == bond::BT_SET || field.type.id == bond::BT_MAP)
+        {
+            return transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
+        }
+        else
+        {
+            return detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
+        }
+    }
+
+
     template <typename Transform>
     bool
     ReadFields(const RuntimeSchema& schema, const Transform& transform)
     {
         bool done = false;
 
-        for (const_enumerator<std::vector<FieldDef> > enumerator(schema.GetStruct().fields); enumerator.more() && !done;)
+        const_enumerator<std::vector<FieldDef> > enumerator(schema.GetStruct().fields);
+        while (enumerator.more() && !done)
+        {
+            const FieldDef& field = enumerator.next();
+            done = ReadRuntimeField(schema, transform, field);
+        }
+
+        // Skip trailing fields the transform didn't care about.
+        while (enumerator.more())
         {
             const FieldDef& field = enumerator.next();
 
-            if (detail::ReadFieldOmitted(_input))
-            {
-                transform.OmittedField(field.id, field.metadata, field.type.id);
-                continue;
-            }
-
-            if (field.type.id == bond::BondDataType::BT_STRUCT)
-            {
-                done = transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
-            }
-            else if (field.type.id == bond::BondDataType::BT_LIST || field.type.id == bond::BondDataType::BT_SET || field.type.id == bond::BondDataType::BT_MAP)
-            {
-                done = transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
-            }
-            else
-            {
-                done = detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
-            }
+            ReadRuntimeField(schema, Null(), field);
         }
 
         return done;
     }
+
+
 };
 
 

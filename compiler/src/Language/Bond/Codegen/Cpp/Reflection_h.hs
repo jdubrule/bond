@@ -53,21 +53,35 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
         {#{fieldTemplates structFields}};
 
         private:
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES) || defined(BOND_ENABLE_PRECXX11_MPL_SCHEMAS)
         typedef boost::mpl::list<> fields0;
         #{newlineSep 2 pushField reverseIndexedFields}
 
         public: typedef #{typename}fields#{length structFields}::type fields;
+#endif
 
+#if !defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
         public: typedef std::integral_constant<size_t, #{length structFields}> fieldCount;
-        template<size_t fieldIndex> struct field {};
+        template<size_t I> struct field {};
         #{newlineSep 2 fieldTemplateArray indexedFields}
+
+        template<typename F> struct fieldIndex {};
+        #{newlineSep 2 fieldIndexTemplateArray indexedFields}
+#endif
+
         #{constructor}
-        
+
         static bond::Metadata GetMetadata()
         {
+        #if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+            return bond::reflection::MetadataInit#{metadataInitArgsMpl}("#{declName}", "#{getDeclTypeName idl s}",
+                #{CPP.attributeInit declAttributes}
+            );
+        #else
             return bond::reflection::MetadataInit#{metadataInitArgs}("#{declName}", "#{getDeclTypeName idl s}",
                 #{CPP.attributeInit declAttributes}
             );
+        #endif
         }
     };
     #{onlyTemplate $ CPP.schemaMetadata cpp s}|]
@@ -78,7 +92,8 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
 
         onlyTemplate x = if null declParams then mempty else x
 
-        metadataInitArgs = onlyTemplate [lt|<boost::mpl::list#{structParams} >|]
+        metadataInitArgsMpl = onlyTemplate [lt|<boost::mpl::list#{structParams} >|]
+        metadataInitArgs = onlyTemplate [lt|#{structParams}|]
 
         typename = onlyTemplate [lt|typename |]
 
@@ -109,6 +124,9 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
 
         fieldTemplateArray (field, i) =
             [lt|template<> struct field<#{i}> { typedef #{typename} var::#{field} type; };|]
+
+        fieldIndexTemplateArray (field, i) =
+            [lt|template<> struct fieldIndex<#{typename} var::#{field}>: std::integral_constant<size_t, #{i}> {};|]
 
         fieldMetadata Field {..} =
             [lt|private: static const bond::Metadata s_#{fieldName}_metadata;|]

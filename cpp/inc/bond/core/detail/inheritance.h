@@ -128,7 +128,6 @@ protected:
         detail::StructEnd(_input, true);
 
         for_each_field<T>([this](auto field) { static_cast<Parser*>(this)->SkipOneField(field); });
-//        static_cast<Parser*>(this)->SkipFields(typename boost::mpl::begin<typename T::fields>::type());
 
         return result;
     }

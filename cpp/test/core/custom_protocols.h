@@ -60,6 +60,7 @@ namespace bond
     template <> struct
     customize<protocols>
     {
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
         template <typename T> struct
         modify
         {
@@ -71,6 +72,13 @@ namespace bond
                 type1, UntaggedProtocolReader<InputBuffer>
             >::type type;
         };
+#else
+        template<typename T> struct modify;
+        template<typename... S> struct modify<ProtocolList<S...>>
+        {
+            using type = ProtocolList<UntaggedProtocolReader<InputBuffer>, unit_test::TestReader<InputBuffer>, S...>;
+        };
+#endif
     };
 
     // Protocols are disabled by default and we leave TestReader disabled

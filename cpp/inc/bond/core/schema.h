@@ -366,6 +366,7 @@ namespace detail
     {
         static void foreach(F f)
         {
+            (f);
             auto doThese =
             {
                 0,
