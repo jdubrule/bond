@@ -289,7 +289,18 @@ bond::Metadata MetadataInit(const char* name, const char* qualified_name, const 
 
 const reflection::nothing nothing = {};
 
-#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+#ifdef BOND_CXX11_NO_VARIADIC_TEMPLATES
+template <typename T, typename Iter> struct 
+field_id
+{
+    static const uint16_t value = boost::mpl::deref<Iter>::type::id;
+};
+
+template <typename T> struct 
+field_id<T, typename boost::mpl::end<T>::type>
+{
+    static const uint16_t value = invalid_field_id;
+};
 
 template <typename T, uint16_t minId = 0> struct 
 next_required_field
