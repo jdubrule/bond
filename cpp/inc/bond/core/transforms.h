@@ -463,7 +463,6 @@ struct AssignToFirstMatching<T, Pred, std::index_sequence<S...>>
     }
 };
 
-
 struct nested_predicate
 {
     template<typename T>

@@ -136,6 +136,7 @@ private:
         return false; // Don't skip fields
     }
 
+
     template <typename Transform>
     void
     EndFields(const Transform&)
