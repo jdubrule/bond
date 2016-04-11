@@ -441,6 +441,7 @@ protected:
     }
 };
 
+
 template<typename T, typename Pred, typename Seq = std::make_index_sequence<schema<T>::type::fieldCount>>
 struct AssignToFirstMatching;
 

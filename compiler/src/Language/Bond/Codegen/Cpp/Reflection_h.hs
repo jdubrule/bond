@@ -64,7 +64,6 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
         public: static const size_t fieldCount = #{length structFields};
         template<size_t I> struct field {};
         #{newlineSep 2 fieldTemplateArray indexedFields}
-
         template<typename F> struct fieldIndex {};
         #{newlineSep 2 fieldIndexTemplateArray indexedFields}
 #endif

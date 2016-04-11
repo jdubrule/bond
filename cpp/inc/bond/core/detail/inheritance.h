@@ -76,11 +76,6 @@ inline const Base& base_cast(const T& obj)
 template<typename C, typename TSchema, typename Seq = std::make_index_sequence<TSchema::fieldCount>>
 struct FieldIterate;
 
-// A partial specialization of the above.
-// Here we convert the integer_sequence into a sequence of integers S
-// We can use variable argument expansion to generate the code inline
-// with this sequence.
-//
 template<typename C, typename TSchema, size_t... S>
 struct FieldIterate<C, TSchema, std::index_sequence<S...>>
 {
