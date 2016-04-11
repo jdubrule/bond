@@ -318,9 +318,9 @@ namespace detail
         static const bool currentFieldIsRequired = std::is_same<t_Schema::field<t_currentFieldIndex::value>::type::field_modifier, reflection::required_field_modifier>::value;
 
 	public:
-		static const uint16_t value = currentFieldId >= minId && currentFieldIsRequired ?
+        static const uint16_t value = currentFieldId >= minId && currentFieldIsRequired ?
             currentFieldId
-			: next_required_field_helper<t_Schema, std::integral_constant<size_t, t_currentFieldIndex::value + 1>, minId>::value;
+            : next_required_field_helper<t_Schema, std::integral_constant<size_t, t_currentFieldIndex::value + 1>, minId>::value;
     };
 
     template<typename t_Schema, uint16_t minId>
