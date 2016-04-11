@@ -8,8 +8,10 @@
 #include <boost/ref.hpp>
 
 #include <boost/mpl/list.hpp>
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
 #include <boost/mpl/push_front.hpp>
 #include <boost/mpl/copy_if.hpp>
+#endif
 
 #include "customize.h"
 #include "detail/odr.h"

@@ -322,7 +322,7 @@ namespace detail
     };
 
     template<typename t_Schema, uint16_t minId>
-    struct next_required_field_helper<t_Schema, typename t_Schema::fieldCount, minId>:
+    struct next_required_field_helper<t_Schema, std::integral_constant<size_t, t_Schema::fieldCount>, minId>:
         std::integral_constant<uint16_t, invalid_field_id>
     {};
 }
@@ -342,7 +342,7 @@ public:
 
 template<typename T>
 struct is_empty_struct :
-    std::integral_constant<bool, schema<T>::type::fieldCount::value == 0>
+    std::integral_constant<bool, schema<T>::type::fieldCount == 0>
 {};
 
 template<bool ...Tail>
@@ -354,7 +354,7 @@ struct are_all_true<Head, Tail...>
     static const bool value = Head && are_all_true<Tail...>::value;
 };
 
-template<typename t_Schema, size_t t_fieldToStartAt = 0, typename Seq = std::make_index_sequence<t_Schema::fieldCount::value - t_fieldToStartAt>>
+template<typename t_Schema, size_t t_fieldToStartAt = 0, typename Seq = std::make_index_sequence<t_Schema::fieldCount - t_fieldToStartAt>>
 struct any_required_fields;
 
 template<typename t_Schema, size_t t_fieldToStartAt, size_t... S>
@@ -418,9 +418,13 @@ schema<Unknown, Unused>
     struct type
     {
         typedef no_base base;
+#if defined(BOND_ENABLE_PRECXX11_MPL_SCHEMAS)
         typedef boost::mpl::list<>::type fields;
+#endif
 
-        typedef std::integral_constant<size_t, 0> fieldCount;
+#if !defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+        static const size_t fieldCount = 0;
+#endif
 
         static const Metadata metadata;
 

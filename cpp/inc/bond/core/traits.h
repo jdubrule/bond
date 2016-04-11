@@ -64,7 +64,7 @@ template <typename T, typename Enable = void> struct
 schema;
 
 template <typename T> struct
-schema<T, typename boost::enable_if<is_class<typename T::Schema::fieldCount> >::type>
+schema<T, typename boost::enable_if_c<std::is_class<typename T::Schema>::value && std::is_same<const size_t, decltype(typename T::Schema::fieldCount)>::value>::type>
 {
     typedef typename T::Schema type;
 };

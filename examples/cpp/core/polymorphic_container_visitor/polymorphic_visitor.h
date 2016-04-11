@@ -1,6 +1,7 @@
 #pragma once
 
 #include <bond/core/bond.h>
+#include "boost/mpl/for_each.hpp"
 
 namespace polymorphic
 {

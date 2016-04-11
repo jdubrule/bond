@@ -459,7 +459,7 @@ struct DoIf<TField, Pred, true>
     }
 };
 
-template<typename T, typename Pred, typename Seq = std::make_index_sequence<schema<T>::type::fieldCount::value>>
+template<typename T, typename Pred, typename Seq = std::make_index_sequence<schema<T>::type::fieldCount>>
 struct AssignToFirstMatching;
 
 template<typename T, typename Pred, size_t... S>

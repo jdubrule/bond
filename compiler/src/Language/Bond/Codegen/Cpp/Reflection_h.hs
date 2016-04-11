@@ -53,7 +53,7 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
         {#{fieldTemplates structFields}};
 
         private:
-#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES) || defined(BOND_ENABLE_PRECXX11_MPL_SCHEMAS)
+#if defined(BOND_ENABLE_PRECXX11_MPL_SCHEMAS)
         typedef boost::mpl::list<> fields0;
         #{newlineSep 2 pushField reverseIndexedFields}
 
@@ -61,7 +61,7 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
 #endif
 
 #if !defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
-        public: typedef std::integral_constant<size_t, #{length structFields}> fieldCount;
+        public: static const size_t fieldCount = #{length structFields};
         template<size_t I> struct field {};
         #{newlineSep 2 fieldTemplateArray indexedFields}
 

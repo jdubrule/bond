@@ -76,8 +76,13 @@ TEST_CASE_END
 template <typename T> struct
 untagged_payload_size
 {
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
     static const unsigned value = (boost::mpl::size<typename T::Schema::fields>::value + 7) / 8
                                 + untagged_payload_size<typename T::Schema::base>::value;
+#else
+    static const unsigned value = (T::Schema::fieldCount + 7) / 8
+        + untagged_payload_size<typename T::Schema::base>::value;
+#endif
 };
 
 template <typename T>

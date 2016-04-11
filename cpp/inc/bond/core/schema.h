@@ -353,7 +353,7 @@ inline const std::map<std::string, T>& GetEnumNames()
 
 namespace detail
 {
-    template<typename F, typename Schema, typename Seq = std::make_integer_sequence<int, Schema::fieldCount::value>>
+    template<typename F, typename Schema, typename Seq = std::make_index_sequence<Schema::fieldCount>>
     struct for_each_field_impl;
 
     // A partial specialization of the above.
@@ -361,8 +361,8 @@ namespace detail
     // We can use variable argument expansion to generate the code inline
     // with this sequence.
     //
-    template<typename F, typename t_schema, int... S>
-    struct for_each_field_impl<F, t_schema, std::integer_sequence<int, S...>>
+    template<typename F, typename t_schema, size_t... S>
+    struct for_each_field_impl<F, t_schema, std::index_sequence<S...>>
     {
         static void foreach(F f)
         {
@@ -380,7 +380,11 @@ template<typename t_schema, typename F>
 inline
 void for_each_field(F f)
 {
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+    boost::mpl::for_each<typename t_schema::fields>(f);
+#else
     detail::for_each_field_impl<F, t_schema>::foreach(f);
+#endif
 }
 
 } // namespace bond

@@ -353,6 +353,30 @@ is_optional_field
     static const bool value = std::is_same<typename Field::field_modifier, bond::reflection::optional_field_modifier>::value;
 };
 
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+template<typename t_schema>
+struct has_optional_fields
+{
+    using boost::mpl::_;
+    static const bool value = (boost::mpl::count_if<typename t_schema::fields, is_optional_field<_> >::value != 0);
+}
+#else
+template<typename t_schema, typename Seq = std::make_index_sequence<t_schema::fieldCount>>
+struct has_optional_fields;
+
+template<typename t_schema, size_t F, size_t... S>
+struct has_optional_fields<t_schema, std::index_sequence<F, S...>>
+{
+    static const bool value = is_optional_field<t_schema::field<F>::type>::value || has_optional_fields<t_schema, std::index_sequence<S...>>::value;
+};
+
+template<typename t_schema>
+struct has_optional_fields<t_schema, std::index_sequence<>>
+{
+    static const bool value = false;
+};
+#endif
+
 
 template <typename T>
 void CopyAndMove(const T& src)
@@ -380,7 +404,7 @@ void Binding(const From& from, uint16_t version = bond::v1)
 
         To to;
         
-        if (boost::mpl::count_if<typename From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (!has_optional_fields<From::Schema>::value)
         {
             to = InitRandom<To>();
             Fixup(to);
@@ -397,7 +421,7 @@ void Binding(const From& from, uint16_t version = bond::v1)
 
         To to;
         
-        if (boost::mpl::count_if<typename From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (!has_optional_fields<From::Schema>::value)
         {
             to = InitRandom<To>();
             Fixup(to);
@@ -450,7 +474,7 @@ void Mapping(const From& from, uint16_t version = bond::v1)
 
         To to;
         
-        if (boost::mpl::count_if<From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (!has_optional_fields<From::Schema>::value)
         {
             to = InitRandom<To>();
             Fixup(to);
@@ -467,7 +491,7 @@ void Mapping(const From& from, uint16_t version = bond::v1)
 
         To to;
         
-        if (boost::mpl::count_if<From::Schema::fields, is_optional_field<_> >::value == 0)
+        if (!has_optional_fields<From::Schema>::value)
         {
             to = InitRandom<To>();
             Fixup(to);
@@ -509,7 +533,7 @@ void Merging(Payload payload, const T& obj, uint16_t version = bond::v1, bool me
     {
         T to;
         
-        if (boost::mpl::count_if<typename T::Schema::fields, is_optional_field<_> >::value == 0)
+        if (!has_optional_fields<T::Schema>::value)
         {
             to = InitRandom<T>();
             Fixup(to);
@@ -525,7 +549,7 @@ void Merging(Payload payload, const T& obj, uint16_t version = bond::v1, bool me
     {
         Payload to;
 
-        if (boost::mpl::count_if<typename Payload::Schema::fields, is_optional_field<_> >::value == 0)
+        if (!has_optional_fields<Payload::Schema>::value)
         {
             to = InitRandom<Payload>();
             Fixup(to);

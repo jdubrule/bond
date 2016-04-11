@@ -4,6 +4,12 @@
 #pragma once
 
 #include <boost/static_assert.hpp>
+#if defined(BOOST_NO_CXX11_HDR_TYPE_TRAITS)
+#include <boost/mpl/if.hpp>
+#else
+#include <type_traits>
+#endif
+
 
 #include "config.h"
 #include "schema.h"
@@ -265,7 +271,11 @@ public:
     typename boost::enable_if_c<is_matching_basic<T, X>::value && !is_string_type<T>::value>::type
     Deserialize(X& var) const
     {
+#if defined(BOOST_NO_CXX11_HDR_TYPE_TRAITS)
         typename boost::mpl::if_c<is_enum<X>::value && sizeof(X) == sizeof(T), X, T>::type data;
+#else
+        typename std::conditional<is_enum<X>::value && sizeof(X) == sizeof(T), X, T>::type data;
+#endif
         
         _skip = false;
         _input.Read(data);

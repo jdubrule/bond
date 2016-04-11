@@ -2,6 +2,7 @@
 
 #include <boost/multi_index_container.hpp>
 #include <bond/core/reflection.h>
+#include <bond/core/schema.h>
 
 template <typename T>
 class move_check
@@ -27,7 +28,7 @@ typename boost::enable_if<bond::has_schema<T>, bool>::type
 moved(const T& src)
 {
     bool mov = true;
-    boost::mpl::for_each<typename T::Schema::fields>(move_check<T>(src, mov));
+    bond::for_each_field<T::Schema>(move_check<T>(src, mov));
     return mov;
 }
 
