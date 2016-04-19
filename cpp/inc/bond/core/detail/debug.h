@@ -19,11 +19,7 @@ public:
         : _var(var),
           _default(true)
     {
-#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
-        boost::mpl::for_each<typename schema<T>::type::fields>(boost::ref(*this));
-#else
         for_each_field<schema<T>::type>(std::ref(*this));
-#endif
     }
 
     operator bool()
