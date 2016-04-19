@@ -72,14 +72,16 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
 
         static bond::Metadata GetMetadata()
         {
-        #if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
-            return bond::reflection::MetadataInit#{metadataInitArgsMpl}("#{declName}", "#{getDeclTypeName idl s}",
-                #{CPP.attributeInitBoost declAttributes}
-            );
+        #if defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
+            const bond::reflection::Attributes attributes = #{CPP.attributeInitBoost declAttributes};
         #else
-            return bond::reflection::MetadataInit#{metadataInitArgs}("#{declName}", "#{getDeclTypeName idl s}",
-                #{CPP.attributeInit declAttributes}
-            );
+            const bond::reflection::Attributes attributes = #{CPP.attributeInit declAttributes};
+        #endif
+
+        #if defined(BOOST_NO_CXX11_VARIADIC_TEMPLATES)
+            return bond::reflection::MetadataInit#{metadataInitArgsMpl}("#{declName}", "#{getDeclTypeName idl s}", attributes);
+        #else
+            return bond::reflection::MetadataInit#{metadataInitArgs}("#{declName}", "#{getDeclTypeName idl s}", std::move(attributes));
         #endif
         }
     };
