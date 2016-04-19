@@ -34,3 +34,6 @@
 
 // C4512: assignment operator could not be generated
 #pragma warning(disable: 4512)
+
+// C4592: symbol will be dynamically initialized (implementation limitation)
+#pragma warning(disable: 4592)

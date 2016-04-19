@@ -13,6 +13,7 @@ module Language.Bond.Codegen.Cpp.Util
     , modifierTag
     , defaultValue
     , attributeInit
+    , attributeInitBoost
     , schemaMetadata
     , ifndef
     , defaultedFunctions
@@ -60,11 +61,18 @@ template d = if null $ declParams d then mempty else [lt|template <typename #{pa
 -- attribute initializer
 attributeInit :: [Attribute] -> Text
 attributeInit [] = "bond::reflection::Attributes()"
-attributeInit xs = [lt|boost::assign::map_list_of<std::string, std::string>#{newlineBeginSep 5 attrNameValue xs}|]
+attributeInit xs = [lt|{#{newlineBeginSep 5 attrNameValue xs}}|]
   where
     idl = MappingContext idlTypeMapping [] [] []  
-    attrNameValue Attribute {..} = [lt|("#{getQualifiedName idl attrName}", "#{attrValue}")|]
+    attrNameValue Attribute {..} = [lt|{"#{getQualifiedName idl attrName}", "#{attrValue}"},|]
 
+-- Boost attribute initializer
+attributeInitBoost :: [Attribute] -> Text
+attributeInitBoost [] = "bond::reflection::Attributes()"
+attributeInitBoost xs = [lt|boost::assign::map_list_of<std::string, std::string>#{newlineBeginSep 5 attrNameValue xs}|]
+  where
+    idl = MappingContext idlTypeMapping [] [] []
+    attrNameValue Attribute {..} = [lt|("#{getQualifiedName idl attrName}", "#{attrValue}")|]
 
 -- modifier tag type for a field
 modifierTag :: Field -> Text
