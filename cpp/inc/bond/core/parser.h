@@ -378,6 +378,7 @@ private:
 
         _input.ReadFieldEnd();
     }
+
  
     template <typename T, typename Transform>
     typename boost::enable_if_c<is_nested_field<T>::value
