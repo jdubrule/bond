@@ -10,7 +10,6 @@ tag versions. The Bond compiler (`gbc`) and
 [compiler library](https://hackage.haskell.org/package/bond) have a slightly
 different versioning scheme, following the Haskell community's
 [package versioning policy](https://wiki.haskell.org/Package_versioning_policy).
-
 ## 4.2.0: 2016-04-28 ##
 
 * `gbc` & compiler library: 0.4.0.2
