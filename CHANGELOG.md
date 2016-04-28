@@ -30,10 +30,10 @@ different versioning scheme, following the Haskell community's
 * Add support for Compact Binary v2 writing.
   [Issue #70](https://github.com/Microsoft/bond/issues/70)
 
-## Yet to be released ##
+## 4.2.0: 2016-04-28 ##
 
-* `gbc` & compiler library: TBD
-* C# NuGet version: TBD
+* `gbc` & compiler library: 0.4.0.2
+* C# NuGet version: 4.2.0
 
 ### C# ###
 
