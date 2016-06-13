@@ -121,21 +121,21 @@ Protocol Guess(InputFile input)
 
     input.Read(word);
 
-    if (word == bond::ProtocolType::FAST_PROTOCOL
-     || word == bond::ProtocolType::COMPACT_PROTOCOL
-     || word == bond::ProtocolType::SIMPLE_PROTOCOL)
-        return marshal;
+    if (word == static_cast<uint16_t>(bond::ProtocolType::FAST_PROTOCOL)
+     || word == static_cast<uint16_t>(bond::ProtocolType::COMPACT_PROTOCOL)
+     || word == static_cast<uint16_t>(bond::ProtocolType::SIMPLE_PROTOCOL))
+        return Protocol::marshal;
 
     if (TryProtocol(mbp))
-        return fast;
+        return Protocol::fast;
 
     if (TryProtocol(cbp))
-        return compact;
+        return Protocol::compact;
 
     if (TryProtocol(cbp2))
-        return compact2;
+        return Protocol::compact2;
 
-    return simple;
+    return Protocol::simple;
 }
 
 
@@ -201,37 +201,37 @@ bool TranscodeFrom(Reader reader, const Options& options)
 
     switch (options.to)
     {
-        case compact:
+	case Protocol::compact:
         {
             bond::CompactBinaryWriter<bond::StdioOutputStream> writer(out);
             TranscodeFromTo(reader, writer, options);
             return true;
         }
-        case compact2:
+        case Protocol::compact2:
         {
             bond::CompactBinaryWriter<bond::StdioOutputStream> writer(out, bond::v2);
             TranscodeFromTo(reader, writer, options);
             return true;
         }
-        case fast:
+        case Protocol::fast:
         {
             bond::FastBinaryWriter<bond::StdioOutputStream> writer(out);
             TranscodeFromTo(reader, writer, options);
             return true;
         }
-        case simple:
+        case Protocol::simple:
         {
             bond::SimpleBinaryWriter<bond::StdioOutputStream> writer(out);
             TranscodeFromTo(reader, writer, options);
             return true;
         }
-        case simple2:
+        case Protocol::simple2:
         {
             bond::SimpleBinaryWriter<bond::StdioOutputStream> writer(out, bond::v2);
             TranscodeFromTo(reader, writer, options);
             return true;
         }
-        case json:
+        case Protocol::json:
         {
             bond::SimpleJsonWriter<bond::StdioOutputStream> writer(out, true, 4, options.all_fields);
             TranscodeFromTo(reader, writer, options);
@@ -255,17 +255,17 @@ bool Transcode(Input input, const Options& options)
 
     switch (from)
     {
-        case marshal:
+        case Protocol::marshal:
             return TranscodeFrom(input, options);
-        case compact:
+        case Protocol::compact:
             return TranscodeFrom(bond::CompactBinaryReader<Input>(input), options);
-        case compact2:
+        case Protocol::compact2:
             return TranscodeFrom(bond::CompactBinaryReader<Input>(input, bond::v2), options);
-        case fast:
+        case Protocol::fast:
             return TranscodeFrom(bond::FastBinaryReader<Input>(input), options);
-        case simple:
+        case Protocol::simple:
             return TranscodeFrom(bond::SimpleBinaryReader<Input>(input), options);
-        case simple2:
+        case Protocol::simple2:
             return TranscodeFrom(bond::SimpleBinaryReader<Input>(input, bond::v2), options);
         default:
             return false;
