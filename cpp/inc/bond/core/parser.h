@@ -207,11 +207,11 @@ private:
             return false;
         }
 
-        if (field.type.id == bond::BT_STRUCT)
+        if (field.type.id == bond::BondDataType::BT_STRUCT)
         {
             return transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
         }
-        else if (field.type.id == bond::BT_LIST || field.type.id == bond::BT_SET || field.type.id == bond::BT_MAP)
+        else if (field.type.id == bond::BondDataType::BT_LIST || field.type.id == bond::BondDataType::BT_SET || field.type.id == bond::BondDataType::BT_MAP)
         {
             return transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
         }
@@ -245,8 +245,6 @@ private:
 
         return done;
     }
-
-
 };
 
 
