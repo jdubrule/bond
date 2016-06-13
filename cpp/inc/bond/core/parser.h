@@ -197,7 +197,6 @@ private:
     ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
     {}
 
-
     template<typename Transform>
     bool
     ReadRuntimeField(const RuntimeSchema& schema, const Transform &transform, const FieldDef &field)
