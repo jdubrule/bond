@@ -606,6 +606,10 @@ inline DeserializeElement(X& var, const I& item, const T& element)
             : element(element)
         {}
 
+#ifndef BOOST_NO_CXX11_DELETED_FUNCTIONS
+        Deserialize & operator=(const Deserialize&) = delete;
+#endif
+
         void operator()(typename element_type<X>::type& e)
         {
             this->element.Deserialize(e);
