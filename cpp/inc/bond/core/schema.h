@@ -353,7 +353,25 @@ inline const std::map<std::string, T>& GetEnumNames()
 
 namespace detail
 {
-    template<typename F, typename Schema, typename Seq = std::make_index_sequence<Schema::fieldCount>>
+    template<typename TField, bool TCondition>
+    struct DoIf {
+        template<typename Func>
+        static void DoIt(const Func &)
+        {
+        }
+    };
+
+    template<typename TField>
+    struct DoIf<TField, true>
+    {
+        template<typename Func>
+        static void DoIt(const Func & f)
+        {
+            return f(TField());
+        }
+    };
+
+    template<typename F, typename Schema, typename t_Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
     struct for_each_field_impl;
 
     // A partial specialization of the above.
@@ -361,8 +379,8 @@ namespace detail
     // We can use variable argument expansion to generate the code inline
     // with this sequence.
     //
-    template<typename F, typename t_schema, size_t... S>
-    struct for_each_field_impl<F, t_schema, std::index_sequence<S...>>
+    template<typename F, typename t_schema, typename t_Predicate, size_t... S>
+    struct for_each_field_impl<F, t_schema, t_Predicate, std::index_sequence<S...>>
     {
         static void foreach(F f)
         {
@@ -370,20 +388,26 @@ namespace detail
             auto doThese =
             {
                 0,
-                ((void) f(t_schema::field<S>::type()), 0)...
+                (DoIf<t_schema::field<S>::type, t_Predicate::type<t_schema::field<S>::type>::value>::DoIt(f), 0)...
             };
         }
     };
+
+    struct true_predicate_type
+    {
+        template<typename T>
+        using type = std::true_type;
+    };
 }
 
-template<typename t_schema, typename F>
+template<typename t_schema, typename Predicate = detail::true_predicate_type, typename F>
 inline
 void for_each_field(F f)
 {
 #if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
     boost::mpl::for_each<typename t_schema::fields>(f);
 #else
-    detail::for_each_field_impl<F, t_schema>::foreach(f);
+    detail::for_each_field_impl<F, t_schema, Predicate>::foreach(f);
 #endif
 }
 

@@ -12,6 +12,7 @@
 #include "detail/debug.h"
 #include "detail/double_pass.h"
 #include "detail/marshaled_bonded.h"
+#include "detail/protocol_visitors.h"
 
 #include <boost/static_assert.hpp>
 
@@ -440,25 +441,6 @@ protected:
     }
 };
 
-template<typename TField, typename Pred, bool Go = Pred::type<TField>::value>
-struct DoIf {
-    template<typename Func>
-    static bool DoIt(const Func &)
-    {
-        return false;
-    }
-};
-
-template<typename TField, typename Pred>
-struct DoIf<TField, Pred, true>
-{
-    template<typename Func>
-    static bool DoIt(const Func & f)
-    {
-        return f(TField());
-    }
-};
-
 template<typename T, typename Pred, typename Seq = std::make_index_sequence<schema<T>::type::fieldCount>>
 struct AssignToFirstMatching;
 
@@ -469,12 +451,12 @@ struct AssignToFirstMatching<T, Pred, std::index_sequence<S...>>
     bool operator()(const Func& f) const
     {
         (f);
-
+        typedef schema<T>::type Schema;
         bool done = false;
         auto doThese =
         {
             false,
-            done = !done && DoIf<schema<T>::type::field<S>::type, Pred>::DoIt(f)...
+            (DoIf<Schema::field<S>::type, Pred::type<Schema::field<S>::type>::value>::DoIt([&done, &f](const auto& field) { done = !done && f(field); }) , false)...
         };
 
         return done;
