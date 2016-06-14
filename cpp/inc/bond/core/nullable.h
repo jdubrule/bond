@@ -517,7 +517,7 @@ private:
     template<typename AllocatorT>
     pointer new_value(AllocatorT& alloc)
     {
-        return new_value(alloc, alloc);
+        return new_value_impl<T>(alloc);
     }
 
     template<typename Arg1>
@@ -533,6 +533,41 @@ private:
     pointer new_value(detail::no_allocator&)
     {
         return new T();
+    }
+
+private:
+    template<typename TType, typename AllocatorT>
+    typename boost::enable_if<detail::has_allocator<TType>, pointer>::type
+    new_value_impl(AllocatorT& alloc)
+    {
+        T* p = alloc.allocate(1);
+        try
+        {
+            void* p1 = p;
+            return ::new(p1) T(alloc);
+        }
+        catch (...)
+        {
+            alloc.deallocate(p, 1);
+            throw;
+        }
+    }
+
+    template<typename TType, typename AllocatorT>
+    typename boost::disable_if<detail::has_allocator<TType>, pointer>::type
+    new_value_impl(AllocatorT& alloc)
+    {
+        T* p = alloc.allocate(1);
+        try
+        {
+            void* p1 = p;
+            return ::new(p1) T();
+        }
+        catch (...)
+        {
+            alloc.deallocate(p, 1);
+            throw;
+        }
     }
 
 private:
