@@ -498,7 +498,6 @@ protected:
 template <typename Buffer>
 const uint16_t CompactBinaryReader<Buffer>::magic = static_cast<uint16_t>(ProtocolType::COMPACT_PROTOCOL);
 
-
 class OutputCounter;
 
 
