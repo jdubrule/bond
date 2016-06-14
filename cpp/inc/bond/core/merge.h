@@ -23,7 +23,6 @@ public:
 
     using Serializer<Writer>::Base;
     using Serializer<Writer>::Field;
-    using Serializer<Writer>::Write;
     using Serializer<Writer>::OmittedField;
     using Serializer<Writer>::Container;
 
@@ -140,9 +139,9 @@ private:
         {
             key.Deserialize(k);
 
-            Write(k);
+            Serializer<Writer>::Write(k);
             
-            // Elements of a map migth be serialized out of order, so we must
+            // Elements of a map might be serialized out of order, so we must
             // look up the element to merge by key.
             Merge(mapped_at(var, k), value);
         }
