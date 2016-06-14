@@ -496,7 +496,7 @@ protected:
 };
 
 template <typename Buffer>
-const uint16_t CompactBinaryReader<Buffer>::magic = ProtocolType::COMPACT_PROTOCOL;
+const uint16_t CompactBinaryReader<Buffer>::magic = static_cast<uint16_t>(ProtocolType::COMPACT_PROTOCOL);
 
 
 class OutputCounter;
@@ -604,20 +604,21 @@ public:
 
     void WriteFieldBegin(BondDataType type, uint16_t id)
     {
-        BOOST_ASSERT((type & 0x1f) == type);
+		const uint8_t dataType = static_cast<uint8_t>(type);
+        BOOST_ASSERT((dataType & 0x1f) == dataType);
 
         if (id <= 5)
         {
-            _output.Write(static_cast<uint8_t>(type | ((id) << 5)));
+            _output.Write(static_cast<uint8_t>(dataType | ((id) << 5)));
         }
         else if (id <= 0xff)
         {
-            _output.Write(static_cast<uint8_t>(type | (0x06 << 5)));
+            _output.Write(static_cast<uint8_t>(dataType | (0x06 << 5)));
             _output.Write(static_cast<uint8_t>(id));
         }
         else
         {
-            _output.Write(static_cast<uint8_t>(type | (0x07 << 5)));
+            _output.Write(static_cast<uint8_t>(dataType | (0x07 << 5)));
             _output.Write(id);
         }
     }
@@ -629,15 +630,16 @@ public:
     // WriteContainerBegin
     void WriteContainerBegin(uint32_t size, BondDataType type)
     {
-        BOOST_ASSERT((type & 0x1f) == type);
+		const uint8_t dataTypeCode = static_cast<uint8_t>(type);
+        BOOST_ASSERT((dataTypeCode & 0x1f) == dataTypeCode);
 
         if (v2 == _version && size < 7)
         {
-            Write(static_cast<uint8_t>(type | ((size + 1) << 5)));
+            Write(static_cast<uint8_t>(dataTypeCode | ((size + 1) << 5)));
         }
         else
         {
-            Write(static_cast<uint8_t>(type));
+            Write(dataTypeCode);
             Write(size);
         }
     }

@@ -171,7 +171,7 @@ private:
 
 
 template <typename Buffer>
-const uint16_t SimpleJsonReader<Buffer>::magic = ProtocolType::SIMPLE_JSON_PROTOCOL;
+const uint16_t SimpleJsonReader<Buffer>::magic = static_cast<uint16_t>(ProtocolType::SIMPLE_JSON_PROTOCOL);
 
 // Disable fast pass-through optimization for Simple JSON
 template <typename Input, typename Output> struct

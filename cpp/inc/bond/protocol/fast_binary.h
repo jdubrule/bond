@@ -363,7 +363,7 @@ protected:
 };
 
 template <typename Buffer>
-const uint16_t FastBinaryReader<Buffer>::magic = ProtocolType::FAST_PROTOCOL;
+const uint16_t FastBinaryReader<Buffer>::magic = static_cast<uint16_t>(ProtocolType::FAST_PROTOCOL);
 
 template <typename Buffer>
 const uint16_t FastBinaryReader<Buffer>::version = v1;
