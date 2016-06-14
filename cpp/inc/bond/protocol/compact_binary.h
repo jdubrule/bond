@@ -603,7 +603,7 @@ public:
 
     void WriteFieldBegin(BondDataType type, uint16_t id)
     {
-		const uint8_t dataType = static_cast<uint8_t>(type);
+        const uint8_t dataType = static_cast<uint8_t>(type);
         BOOST_ASSERT((dataType & 0x1f) == dataType);
 
         if (id <= 5)
@@ -629,7 +629,7 @@ public:
     // WriteContainerBegin
     void WriteContainerBegin(uint32_t size, BondDataType type)
     {
-		const uint8_t dataTypeCode = static_cast<uint8_t>(type);
+        const uint8_t dataTypeCode = static_cast<uint8_t>(type);
         BOOST_ASSERT((dataTypeCode & 0x1f) == dataTypeCode);
 
         if (v2 == _version && size < 7)

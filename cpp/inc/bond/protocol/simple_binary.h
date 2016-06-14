@@ -210,7 +210,6 @@ protected:
 template <typename Buffer>
 const uint16_t SimpleBinaryReader<Buffer>::magic = static_cast<uint16_t>(ProtocolType::SIMPLE_PROTOCOL);
 
-
 /// @brief Writer for Simple Binary protocol
 template <typename BufferT>
 class SimpleBinaryWriter
