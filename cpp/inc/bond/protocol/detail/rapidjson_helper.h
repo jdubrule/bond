@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <bond/core/customize.h>
+
 #define RAPIDJSON_NO_INT64DEFINE
 #define RAPIDJSON_ASSERT BOOST_ASSERT
 #define RAPIDJSON_PARSE_ERROR(err, offset) bond::RapidJsonException(rapidjson::GetParseError_En(err), offset)
