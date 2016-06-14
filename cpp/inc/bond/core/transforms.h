@@ -463,6 +463,7 @@ struct AssignToFirstMatching<T, Pred, std::index_sequence<S...>>
     }
 };
 
+
 struct nested_predicate
 {
     template<typename T>
@@ -488,7 +489,10 @@ struct struct_predicate
     using type = is_struct_field<T>;
 };
 
+<<<<<<< 73225934422c9262a71e93494a1b0d93cb829af4
 
+=======
+>>>>>>> Convert for_each_field to take a predicate
 } // namespace detail
 
 
