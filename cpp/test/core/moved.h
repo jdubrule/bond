@@ -14,7 +14,7 @@ public:
     {}
 
     template <typename Field>
-    void operator()(const Field&);
+    void operator()(const Field&) const;
 
 private:
     move_check& operator=(const move_check&);
@@ -74,7 +74,7 @@ bool moved(const boost::multi_index::multi_index_container<T, I>&)
 
 template <typename T>
 template <typename Field>
-void move_check<T>::operator()(const Field&)
+void move_check<T>::operator()(const Field&) const
 {
     mov = mov && moved(Field::GetVariable(src));
 }

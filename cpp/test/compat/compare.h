@@ -91,7 +91,7 @@ public:
     {}
 
     template <typename Field>
-    void operator()(const Field&)
+    void operator()(const Field&) const
     {
         equal = equal && Equal(Field::GetVariable(left), Field::GetVariable(right));
     }

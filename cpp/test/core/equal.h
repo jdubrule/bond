@@ -28,7 +28,7 @@ public:
     {}
 
     template <typename Field>
-    void operator()(const Field&);
+    void operator()(const Field&) const;
 
 private:
     Compare& operator=(const Compare&);
@@ -274,7 +274,7 @@ bool operator!=(const SkipStruct<T>& left, const SkipStruct2<T>& right)
 
 template <typename T>
 template <typename Field>
-void Compare<T>::operator()(const Field&)
+void Compare<T>::operator()(const Field&) const
 {
     equal = equal && Equal(Field::GetVariable(left), Field::GetVariable(right));
 }
