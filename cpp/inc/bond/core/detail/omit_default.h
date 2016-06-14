@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #pragma once
+#include <bond/core/reflection.h>
 
 namespace bond
 {
@@ -38,7 +39,7 @@ inline
 typename boost::enable_if<is_type_alias<T>, bool>::type 
 is_default(const T& value, const Metadata& metadata)
 {
-    return (metadata.default_value == get_aliased_value(value));
+    return is_default(get_aliased_value(value), metadata);
 }
 
 
