@@ -2,6 +2,7 @@
 
 #include <bond/core/bond.h>
 #include <bond/stream/output_buffer.h>
+#include <bond/protocol/simple_json_writer.h>
 
 using namespace examples::merge;
 
