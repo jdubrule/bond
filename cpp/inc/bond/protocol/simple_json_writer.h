@@ -226,10 +226,12 @@ class Serializer<SimpleJsonWriter<Buffer> >
 public:
     typedef SimpleJsonWriter<Buffer> writer_type;
 
-    Serializer(writer_type& writer)
+    Serializer(writer_type& writer, bool base = false)
         : _output(writer),
           _level(0)
-    {}
+    {
+        (base);
+    }
 
     void Begin(const Metadata& /*metadata*/) const
     {
