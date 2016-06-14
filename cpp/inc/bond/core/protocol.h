@@ -20,18 +20,6 @@
 #include <bond/protocol/fast_binary.h>
 #include <bond/protocol/simple_json_reader.h>
 
-#if !defined(BOND_COMPACT_BINARY_PROTOCOL) \
- && !defined(BOND_SIMPLE_BINARY_PROTOCOL) \
- && !defined(BOND_FAST_BINARY_PROTOCOL) \
- && !defined(BOND_SIMPLE_JSON_PROTOCOL)
-
-#   define BOND_COMPACT_BINARY_PROTOCOL
-#   define BOND_SIMPLE_BINARY_PROTOCOL
-#   define BOND_FAST_BINARY_PROTOCOL
-// BOND_SIMPLE_JSON_PROTOCOL disabled by default
-
-#endif
-
 namespace bond
 {
 

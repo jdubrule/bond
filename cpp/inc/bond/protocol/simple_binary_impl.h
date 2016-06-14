@@ -6,6 +6,7 @@
 namespace bond
 {
 
+#if defined(BOND_SIMPLE_BINARY_PROTOCOL)
 template <typename BufferT>
 template <typename T>
 inline void SimpleBinaryReader<BufferT>::Skip(const bonded<T, SimpleBinaryReader&>& bonded)
@@ -75,5 +76,5 @@ inline void SimpleBinaryWriter<BufferT>::WriteFieldOmitted(BondDataType type, ui
             break;
     }
 }
-
+#endif
 }
