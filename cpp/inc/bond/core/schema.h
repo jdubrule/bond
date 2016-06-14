@@ -381,7 +381,6 @@ namespace detail
         {
             return f(std::forward<TArgs>(args)...);
         }
-
     };
 
     template<typename F, typename Schema, typename t_Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
