@@ -821,51 +821,51 @@ get_type_id<std::pair<T1, T2> >::value = std::make_pair(
 
 template <> struct 
 get_type_id<bool>
-    : boost::integral_constant<BondDataType, BondDataType::BT_BOOL> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_BOOL> {};
 
 template <> struct 
 get_type_id<uint8_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_UINT8> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT8> {};
 
 template <> struct 
 get_type_id<uint16_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_UINT16> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT16> {};
 
 template <> struct 
 get_type_id<uint32_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_UINT32> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT32> {};
 
 template <> struct 
 get_type_id<uint64_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_UINT64> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UINT64> {};
 
 template <> struct 
 get_type_id<int8_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_INT8> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT8> {};
 
 template <> struct 
 get_type_id<int16_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_INT16> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT16> {};
 
 template <> struct 
 get_type_id<int32_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_INT32> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT32> {};
 
 template <> struct 
 get_type_id<int64_t>
-    : boost::integral_constant<BondDataType, BondDataType::BT_INT64> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_INT64> {};
 
 template <> struct 
 get_type_id<float>
-    : boost::integral_constant<BondDataType, BondDataType::BT_FLOAT> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_FLOAT> {};
 
 template <> struct 
 get_type_id<double>
-    : boost::integral_constant<BondDataType, BondDataType::BT_DOUBLE> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_DOUBLE> {};
 
 template <> struct
 get_type_id<void>
-    : boost::integral_constant<BondDataType, BondDataType::BT_UNAVAILABLE> {};
+    : std::integral_constant<BondDataType, BondDataType::BT_UNAVAILABLE> {};
 
 template <typename T> struct 
 get_type_id
