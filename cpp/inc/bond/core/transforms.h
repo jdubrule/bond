@@ -456,7 +456,8 @@ struct AssignToFirstMatching<T, Pred, std::index_sequence<S...>>
         auto doThese =
         {
             false,
-            (DoIf<Schema::field<S>::type, Pred::type<Schema::field<S>::type>::value>::DoIt([&done, &f](const auto& field) { done = !done && f(field); }) , false)...
+            done = !done && DoIf<Pred::type<typename Schema::field<S>::type>::value>::DoItBool(f, Schema::field<S>::type())...
+//			(DoIf<Schema::field<S>::type, Pred::type<Schema::field<S>::type>::value>::DoIt([&done, &f](const auto& field) { done = !done && f(field); }) , false)...
         };
 
         return done;
@@ -538,6 +539,7 @@ public:
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
         return detail::AssignToFirstMatching<T, detail::nested_predicate>()([this, &id, &value](const auto &fieldType)
+            -> bool
         {
             return AssignToField(fieldType, id, value);
         });
@@ -548,6 +550,7 @@ public:
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
     {
         return detail::AssignToFirstMatching<T, detail::matching_predicate<X>>()([this, &id, &value](const auto &fieldType)
+            -> bool
         {
             return AssignToField(fieldType, id, value);
         });
@@ -558,6 +561,7 @@ public:
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
     {
         return detail::AssignToFirstMatching<T, detail::container_predicate>()([this, &id, &value](const auto &fieldType)
+            -> bool
         {
             return AssignToField(fieldType, id, value);
         });
@@ -723,6 +727,7 @@ protected:
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
         return detail::AssignToFirstMatching<V, detail::nested_predicate>()([this, &var, &id, &value](const auto &fieldType)
+            -> bool
         {
             return AssignToField(fieldType, var, id, value);
         });
@@ -733,6 +738,7 @@ protected:
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
         return detail::AssignToFirstMatching<V, detail::matching_predicate<X>>()([this, &var, &id, &value](const auto &fieldType)
+            -> bool
         {
             return AssignToField(fieldType, var, id, value);
         });
@@ -743,18 +749,19 @@ protected:
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
         return detail::AssignToFirstMatching<V, detail::container_predicate>()([this, &var, &id, &value](const auto &fieldType)
+            -> bool
         {
             return AssignToField(fieldType, var, id, value);
         });
     }
 
-    
-    template <typename Field, typename V, typename X>
-    bool AssignToField(const Field&, V& var, uint16_t id, const X& value) const
+
+    template <typename TField, typename V, typename X>
+    bool AssignToField(const TField&, V& var, uint16_t id, const X& value) const
     {
-        if (id == Field::id)
+        if (id == TField::id)
         {
-            AssignToVar(Field::GetVariable(var), value);
+            AssignToVar(TField::GetVariable(var), value);
             return true;
         }
         else

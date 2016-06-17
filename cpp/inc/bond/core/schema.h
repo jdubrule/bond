@@ -353,22 +353,35 @@ inline const std::map<std::string, T>& GetEnumNames()
 
 namespace detail
 {
-    template<typename TField, bool TCondition>
+    template<bool TCondition>
     struct DoIf {
-        template<typename Func>
-        static void DoIt(const Func &)
+        template<typename Func, typename... TArgs>
+        static void DoItVoid(const Func &f, TArgs&&...)
         {
+        }
+
+        template<typename Func, typename... TArgs>
+        static bool DoItBool(const Func &, TArgs&&...)
+        {
+            return false;
         }
     };
 
-    template<typename TField>
-    struct DoIf<TField, true>
+    template<>
+    struct DoIf<true>
     {
-        template<typename Func>
-        static void DoIt(const Func & f)
+        template<typename Func, typename... TArgs>
+        static void DoItVoid(const Func & f, TArgs&&... args)
         {
-            return f(TField());
+            f(std::forward<TArgs>(args)...);
         }
+
+        template<typename Func, typename... TArgs>
+        static bool DoItBool(const Func & f, TArgs&&... args)
+        {
+            return f(std::forward<TArgs>(args)...);
+        }
+
     };
 
     template<typename F, typename Schema, typename t_Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
@@ -388,7 +401,7 @@ namespace detail
             auto doThese =
             {
                 0,
-                (DoIf<t_schema::field<S>::type, t_Predicate::type<t_schema::field<S>::type>::value>::DoIt(f), 0)...
+                (DoIf<t_Predicate::type<t_schema::field<S>::type>::value>::DoItVoid(f, t_schema::field<S>::type()), 0)...
             };
         }
     };
