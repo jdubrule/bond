@@ -138,6 +138,7 @@ struct ValueReader
 //////////////////////////////////////////////////////////////////////////
 // Protocol List:
 //////////////////////////////////////////////////////////////////////////
+#ifndef BOND_NO_CXX11_VARIADIC_TEMPLATES
 
 template<typename... Protocol> struct ProtocolList {};
 
@@ -177,10 +178,16 @@ template<typename... TProtocol> struct ProtocolBoostList<ProtocolList<TProtocol.
     using type = boost::mpl::list<TProtocol...>;
 };
 
+#endif // BOND_NO_CXX11_VARIADIC_TEMPLATES
+
+#ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
+using boost::mpl::_;
+#endif
 
 template <typename Buffer>
 struct Protocols
 {
+#ifndef BOND_NO_CXX11_VARIADIC_TEMPLATES
     using built_in = ProtocolList<
        CompactBinaryReader<Buffer>,
        SimpleBinaryReader<Buffer>,
@@ -193,7 +200,23 @@ struct Protocols
     using type = typename ProtocolListEnabledFilter<built_in>::type;
 
     using mplType = typename ProtocolBoostList<type>::type;
-    using begin = typename boost::mpl::begin<mplType>::type;
+#else
+    typedef typename boost::mpl::list<
+        CompactBinaryReader<Buffer>,
+        SimpleBinaryReader<Buffer>,
+        FastBinaryReader<Buffer>,
+        SimpleJsonReader<Buffer>
+        >::type built_in;
+
+    typedef typename customize<protocols>::modify<built_in>::type all;
+
+    typedef typename boost::mpl::copy_if<
+        all,
+        is_protocol_enabled<_>,
+        boost::mpl::front_inserter<boost::mpl::list<> > >::type mplType;
+#endif
+
+    typedef typename boost::mpl::begin<mplType>::type begin;
 };
 
 
@@ -228,10 +251,18 @@ struct ProtocolReader
         return value == rhs.value;
     }
     
-    using valueTypes = typename ProtocolListPushFront<ValueReader, typename Protocols<Buffer>::all>::type;
-
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+    typename boost::make_variant_over<
+        typename boost::mpl::push_front<
+            typename Protocols<Buffer>::all,
+            ValueReader
+        >::type
+    >::type value;
+#else
+    typedef typename ProtocolListPushFront<ValueReader, typename Protocols<Buffer>::all>::type valueTypes;
+    
     typename ProtocolVariant<valueTypes>::type value;
+#endif
 };
-
 
 } // namespace bond

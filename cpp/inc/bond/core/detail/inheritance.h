@@ -73,6 +73,8 @@ inline const Base& base_cast(const T& obj)
     return static_cast<const Base&>(obj);
 }
 
+#ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
+#else
 template<typename C, typename TSchema, typename Seq = std::make_index_sequence<TSchema::fieldCount>>
 struct FieldIterate;
 
@@ -116,6 +118,7 @@ struct FieldIterate<C, TSchema, std::index_sequence<S...>>
         return done;
     }
 };
+#endif
 
 template <typename Input, typename Parser>
 class ParserInheritance

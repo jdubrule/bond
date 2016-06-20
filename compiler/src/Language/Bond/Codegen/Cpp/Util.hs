@@ -120,7 +120,12 @@ schemaMetadata cpp s@Struct {..} = [lt|
         | otherwise = [lt|
     #{template s}const bond::Metadata #{structName s}::Schema::s_#{fieldName}_metadata
         = bond::reflection::MetadataInit(#{defaultInit f}"#{fieldName}", #{modifierTag f}::value,
-            #{attributeInit fieldAttributes});|]
+#ifdef BOOST_NO_INITIALIZER_LISTS
+            #{attributeInitBoost fieldAttributes});
+#else
+            #{attributeInit fieldAttributes});
+#endif
+            |]
       where
         defaultInit Field {fieldDefault = (Just def)} = [lt|#{explicitDefault def}, |]
         defaultInit _ = mempty

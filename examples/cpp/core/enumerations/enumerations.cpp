@@ -18,10 +18,10 @@ int main()
     fruit = Apple;
     fruit = Fruit::Orange;
 
-    assert(Limits::Int32Min == std::numeric_limits<int32_t>::min());
-    assert(Limits::Int32Max == std::numeric_limits<int32_t>::max());
-    assert(Limits::UInt32Min == std::numeric_limits<uint32_t>::min());
-    assert(Limits::UInt32Max == std::numeric_limits<uint32_t>::max());
+    assert(static_cast<int32_t>(Limits::Int32Min) == std::numeric_limits<int32_t>::min());
+    assert(static_cast<int32_t>(Limits::Int32Max) == std::numeric_limits<int32_t>::max());
+    assert(static_cast<uint32_t>(Limits::UInt32Min) == std::numeric_limits<uint32_t>::min());
+    assert(static_cast<uint32_t>(Limits::UInt32Max) == std::numeric_limits<uint32_t>::max());
 
     return 0;
 }

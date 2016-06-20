@@ -83,8 +83,6 @@ template
 >
 struct FieldTemplate
 {
-    static constexpr bool is_nested_field() { return is_bond_type<field_type>::value; }
-
     /// @brief Type of the field's parent struct
     typedef t_struct struct_type;
 
@@ -311,6 +309,7 @@ private:
     };
 
 public:
+
     static const uint16_t value = field_id<T, typename boost::mpl::find_if<T, is_next_required<_> >::type>::value;
 };
 
@@ -355,6 +354,7 @@ struct is_empty_struct :
     std::integral_constant<bool, schema<T>::type::fieldCount == 0>
 {};
 
+#ifndef BOND_NO_CXX11_VARIADIC_TEMPLATES
 template<bool ...Tail>
 struct are_all_true : std::true_type {};
 
@@ -374,6 +374,13 @@ struct any_required_fields<t_Schema, t_fieldToStartAt, std::index_sequence<S...>
         !std::is_same<typename t_Schema::field<S + t_fieldToStartAt>::type::field_modifier, reflection::required_field_modifier>::value...
     >::value;
 };
+#else
+
+template<typename t_Schema, size_t t_fieldToStartAt = 0>
+struct any_required_fields :
+    std::integral_constant<bool, next_required_field<typename t_Schema::fields, t_fieldToStartAt>::value != invalid_field_id> {};
+
+#endif
 
 struct no_base {};
 

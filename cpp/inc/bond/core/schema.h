@@ -485,7 +485,7 @@ namespace detail
 #endif
 
 
-#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+#ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
 
 #else
     template<typename F, typename Schema, typename t_Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
@@ -536,7 +536,6 @@ void for_each_field(F f)
     detail::for_each_field_impl<F, t_schema, detail::true_predicate_type>::foreach(f);
 #endif
 }
-
 
 // Iterate through matching fields, stopping when F returns true.
 template<typename t_schema, typename Predicate, typename F>

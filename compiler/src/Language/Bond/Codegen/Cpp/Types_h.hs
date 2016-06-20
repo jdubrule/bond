@@ -47,6 +47,7 @@ types_h userHeaders enumHeader allocator cpp file imports declarations = ("_type
 
 #include <bond/core/config.h>
 #include <bond/core/containers.h>
+
 #{newlineSep 0 optionalHeader bondHeaders}
 #{includeEnum}
 #{newlineSepEnd 0 includeImport imports}
