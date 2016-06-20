@@ -15,11 +15,6 @@
 #include <boost/mpl/copy_if.hpp>
 #endif
 
-#if defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
-#include <boost/assign.hpp>
-#include <boost/assign/list_of.hpp>
-#endif
-
 #include <bond/core/bond_types.h>
 #include "bonded.h"
 #include "detail/metadata.h"

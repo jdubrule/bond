@@ -21,6 +21,11 @@ types_cpp cpp file _imports declarations = ("_types.cpp", [lt|
 #include "#{file}_reflection.h"
 #include <bond/core/exception.h>
 
+#if defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX) || 1
+#include <boost/assign.hpp>
+#include <boost/assign/list_of.hpp>
+#endif
+
 #{CPP.openNamespace cpp}
     #{doubleLineSepEnd 1 statics declarations}
 #{CPP.closeNamespace cpp}
@@ -38,7 +43,7 @@ types_cpp cpp file _imports declarations = ("_types.cpp", [lt|
     {
         const
         std::map<std::string, enum #{declName}> _name_to_value_#{declName} =
-#if defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX)
+#if defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX) || 1
             boost::assign::map_list_of<std::string, enum #{declName}>
                 #{newlineSep 4 constantBoost enumConstants};
 #else
