@@ -336,7 +336,24 @@ template <typename T>
 class RequiredFieldValidator
 {
 protected:
+#ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
+    void Begin() const
+    {
+        _required = next_required_field<typename schema<T>::type::fields>::value;
+    }
 
+    template <typename Head>
+    typename boost::enable_if<is_same<typename Head::field_modifier,
+                                      reflection::required_field_modifier> >::type
+    Validate() const
+    {
+        if (_required == Head::id)
+            _required = next_required_field<typename schema<T>::type::fields, Head::id + 1>::value;
+        else
+            MissingFieldException();
+    }
+
+#else
     template<typename TT = T>
     typename boost::enable_if<is_empty_struct<TT>>::type
     Begin() const
@@ -345,7 +362,7 @@ protected:
 
     template<typename TT = T>
     typename boost::disable_if<is_empty_struct<TT>>::type
-        Begin() const
+    Begin() const
     {
         _required = next_required_field<typename schema<T>::type::field<0>::type>::value;
     }
@@ -353,14 +370,14 @@ protected:
     template <typename Head>
     typename boost::enable_if<is_same<typename Head::field_modifier,
         reflection::required_field_modifier> >::type
-        Validate() const
+    Validate() const
     {
         if (_required == Head::id)
             _required = next_required_field<typename schema<T>::type::field<0>::type, Head::id + 1>::value;
         else
             MissingFieldException();
     }
-
+#endif
 
     template <typename Schema>
     typename boost::enable_if_c<any_required_fields<Schema>::value>::type
@@ -442,52 +459,29 @@ protected:
 };
 
 
-template<typename T, typename Pred, typename Seq = std::make_index_sequence<schema<T>::type::fieldCount>>
-struct AssignToFirstMatching;
-
-template<typename T, typename Pred, size_t... S>
-struct AssignToFirstMatching<T, Pred, std::index_sequence<S...>>
-{
-    template<typename Func>
-    bool operator()(const Func& f) const
-    {
-        (f);
-        typedef schema<T>::type Schema;
-        bool done = false;
-        auto doThese =
-        {
-            false,
-            done = !done && DoIf<Pred::type<typename Schema::field<S>::type>::value>::DoItBool(f, Schema::field<S>::type())...
-        };
-
-        return done;
-    }
-};
-
-
 struct nested_predicate
 {
     template<typename T>
-    using type = is_nested_field<T>;
+    struct type: is_nested_field<T> {};
 };
 
 struct container_predicate
 {
     template<typename T>
-    using type = is_container_field<T>;
+    struct type: is_container_field<T> {};
 };
 
 template<typename X>
 struct matching_predicate
 {
     template<typename T>
-    using type = is_matching_field<X, T>;
+    struct type: is_matching_field<X, T> {};
 };
 
 struct struct_predicate
 {
     template<typename T>
-    using type = is_struct_field<T>;
+    struct type: is_struct_field<T> {};
 };
 
 } // namespace detail
@@ -535,7 +529,7 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
-        return detail::AssignToFirstMatching<T, detail::nested_predicate>()([this, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::nested_predicate>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
@@ -546,7 +540,7 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
     {
-        return detail::AssignToFirstMatching<T, detail::matching_predicate<X>>()([this, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::matching_predicate<X>>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
@@ -557,7 +551,7 @@ public:
     template <typename Reader>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
     {
-        return detail::AssignToFirstMatching<T, detail::container_predicate>()([this, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::container_predicate>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
@@ -679,7 +673,7 @@ protected:
     template <typename V, typename X>
     bool AssignToNested(V& var, const PathView& ids, const X& value) const
     {
-        return detail::AssignToFirstMatching<V, detail::struct_predicate>()([this, &var, &ids, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::struct_predicate>([this, &var, &ids, &value](const auto &fieldType)
         {
             return AssignToNested(fieldType, var, ids, value);
         });
@@ -725,7 +719,7 @@ protected:
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
-        return detail::AssignToFirstMatching<V, detail::nested_predicate>()([this, &var, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::nested_predicate>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
@@ -736,7 +730,7 @@ protected:
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
-        return detail::AssignToFirstMatching<V, detail::matching_predicate<X>>()([this, &var, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::matching_predicate<X>>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
@@ -747,7 +741,7 @@ protected:
     template <typename Reader, typename V>
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
-        return detail::AssignToFirstMatching<V, detail::container_predicate>()([this, &var, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::container_predicate>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);

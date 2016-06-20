@@ -353,6 +353,7 @@ inline const std::map<std::string, T>& GetEnumNames()
 
 namespace detail
 {
+#ifndef BOND_NO_CXX11_VARIADIC_TEMPLATES
     template<bool TCondition>
     struct DoIf {
         template<typename Func, typename... TArgs>
@@ -383,14 +384,113 @@ namespace detail
         }
     };
 
+    template<typename TSchema, typename Pred, typename Seq = std::make_index_sequence<TSchema::fieldCount>>
+    struct ForEachStopOnTrue;
+
+    template<typename TSchema, typename Pred, size_t... S>
+    struct ForEachStopOnTrue<TSchema, Pred, std::index_sequence<S...>>
+    {
+        template<typename Func>
+        bool operator()(const Func& f) const
+        {
+            (f);
+            bool done = false;
+            auto doThese =
+            {
+                false,
+                done = !done && DoIf<Pred::type<typename TSchema::field<S>::type>::value>::DoItBool(f, TSchema::field<S>::type())...
+            };
+
+            return done;
+        }
+    };
+
+#else
+    template<bool TCondition>
+    struct DoIf {
+        template<typename Func, typename TField>
+        static void DoItVoid(const Func &f)
+        {
+        }
+
+        template<typename Func, typename TField>
+        static bool DoItBool(const Func &)
+        {
+            return false;
+        }
+    };
+
+    template<>
+    struct DoIf<true>
+    {
+        template<typename Func, typename TField>
+        static void DoItVoid(const Func & f)
+        {
+            f(TField());
+        }
+
+        template<typename Func, typename TField>
+        static bool DoItBool(const Func & f)
+        {
+            return f(TField());
+        }
+    };
+
+    template<typename Predicate, typename F>
+    struct ForEachHelper
+    {
+        ForEachHelper(F & theFunc): f(theFunc)
+        {}
+
+        template<typename TField>
+        void operator()()
+        {
+            DoIf<TField, Predicate<TField>::value>::DoIt(f);
+        }
+
+        F& f;
+    };
+
+    template<typename TSchema, typename Pred>
+    struct ForEachStopOnTrue
+    {
+        template<typename TFields, typename TFunc>
+        typename boost::disable_if<std::is_same<TFields, typename boost::mpl::end<TSchema::fields>::type>, bool>::type
+        DoField(const TFunc& f)
+        {
+            typedef typename boost::mpl::deref<TFields>::type currentField;
+
+            bool done = false;
+            if (Pred<currentField>::value)
+            {
+                done = f(currentField());
+            }
+
+            return done || DoField<boost::mpl::next<TFields>::type>(f);
+        }
+
+        template<typename TFields, typename TFunc>
+        typename boost::enable_if<std::is_same<TFields, typename boost::mpl::end<TSchema::fields>::type>, bool>::type
+        DoField(const TFunc& f)
+        {
+            return false;
+        }
+
+        template<typename Func>
+        bool operator()(const Func& f) const
+        {        
+            return DoField<mpl::begin<TSchema::fields>::type>(f);
+        }
+    };
+#endif
+
+
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+
+#else
     template<typename F, typename Schema, typename t_Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
     struct for_each_field_impl;
 
-    // A partial specialization of the above.
-    // Here we convert the integer_sequence into a sequence of integers S
-    // We can use variable argument expansion to generate the code inline
-    // with this sequence.
-    //
     template<typename F, typename t_schema, typename t_Predicate, size_t... S>
     struct for_each_field_impl<F, t_schema, t_Predicate, std::index_sequence<S...>>
     {
@@ -404,24 +504,54 @@ namespace detail
             };
         }
     };
+#endif
 
     struct true_predicate_type
     {
         template<typename T>
-        using type = std::true_type;
+        struct type: std::integral_constant<bool, true> {};
     };
 }
 
+// Iterate through matching fields
+template<typename t_schema, typename Predicate, typename F>
+inline
+void for_each_field(F f)
+{
+#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)    
+    boost::mpl::for_each<typename t_schema::fields>(details::ForEachHelper<Predicate, F>(f));
+#else
+    detail::for_each_field_impl<F, t_schema, Predicate>::foreach(f);
+#endif
+}
 
-template<typename t_schema, typename Predicate = detail::true_predicate_type, typename F>
+// Iterate through all the fields with no condition
+template<typename t_schema, typename F>
 inline
 void for_each_field(F f)
 {
 #if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
     boost::mpl::for_each<typename t_schema::fields>(f);
 #else
-    detail::for_each_field_impl<F, t_schema, Predicate>::foreach(f);
+    detail::for_each_field_impl<F, t_schema, detail::true_predicate_type>::foreach(f);
 #endif
+}
+
+
+// Iterate through matching fields, stopping when F returns true.
+template<typename t_schema, typename Predicate, typename F>
+inline
+bool ForEachFieldStopOnTrue(F f)
+{
+    return detail::ForEachStopOnTrue<t_schema, Predicate>()(f);
+}
+
+// Iterate through all the fields., stopping when F returns true
+template<typename t_schema, typename F>
+inline
+bool  ForEachFieldStopOnTrue(F f)
+{
+    return detail::ForEachStopOnTrue<t_schema, detail::true_predicate_type>()(f);
 }
 
 } // namespace bond

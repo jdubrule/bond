@@ -130,15 +130,15 @@ public:
     }
 
 #ifdef BOOST_NO_DEFAULTED_FUNCTIONS
-	bonded& operator=(const bonded& rhs)
-	{
-		_data = rhs._data;
-		_schema = rhs._schema;
-		_skip = rhs._skip;
-		_base = rhs._base;
-	}
+    bonded& operator=(const bonded& rhs)
+    {
+        _data = rhs._data;
+        _schema = rhs._schema;
+        _skip = rhs._skip;
+        _base = rhs._base;
+    }
 #else
-	bonded& operator=(const bonded& rhs) = default;
+    bonded& operator=(const bonded& rhs) = default;
 #endif
 
 
