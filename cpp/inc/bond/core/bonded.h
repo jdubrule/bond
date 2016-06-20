@@ -71,10 +71,6 @@ public:
     }
 #endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
-    bonded& operator=(const bonded& rhs) = default;
-#endif
-
     /// @brief Explicit up/down-casting from/to bonded of a derived type
     template <typename U, typename ReaderT>
     explicit
@@ -132,6 +128,18 @@ public:
         if (_skip)
             detail::Skip(_data, *this, std::nothrow);
     }
+
+#ifdef BOOST_NO_DEFAULTED_FUNCTIONS
+	bonded& operator=(const bonded& rhs)
+	{
+		_data = rhs._data;
+		_schema = rhs._schema;
+		_skip = rhs._skip;
+		_base = rhs._base;
+	}
+#else
+	bonded& operator=(const bonded& rhs) = default;
+#endif
 
 
     /// @brief Implicit up-casting to bonded of a base type
