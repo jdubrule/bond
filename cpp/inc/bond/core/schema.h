@@ -384,10 +384,10 @@ namespace detail
         }
     };
 
-    template<typename TSchema, typename Pred, typename Seq = std::make_index_sequence<TSchema::fieldCount>>
+    template<typename TSchema, template <typename> typename Pred, typename Seq = std::make_index_sequence<TSchema::fieldCount>>
     struct ForEachStopOnTrue;
 
-    template<typename TSchema, typename Pred, size_t... S>
+    template<typename TSchema, template <typename> typename Pred, size_t... S>
     struct ForEachStopOnTrue<TSchema, Pred, std::index_sequence<S...>>
     {
         template<typename Func>
@@ -398,7 +398,7 @@ namespace detail
             auto doThese =
             {
                 false,
-                done = !done && DoIf<Pred::type<typename TSchema::field<S>::type>::value>::DoItBool(f, TSchema::field<S>::type())...
+                done = !done && DoIf<Pred<typename TSchema::field<S>::type>::value>::DoItBool(f, TSchema::field<S>::type())...
             };
 
             return done;
@@ -436,7 +436,7 @@ namespace detail
         }
     };
 
-    template<typename Predicate, typename F>
+    template<template <typename> typename Predicate, typename F>
     struct ForEachHelper
     {
         ForEachHelper(F & theFunc): f(theFunc)
@@ -451,7 +451,7 @@ namespace detail
         F& f;
     };
 
-    template<typename TSchema, typename Pred>
+    template<typename TSchema, template <typename> typename Predicate>
     struct ForEachStopOnTrue
     {
         template<typename TFields, typename TFunc>
@@ -488,10 +488,10 @@ namespace detail
 #ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
 
 #else
-    template<typename F, typename Schema, typename t_Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
+    template<typename F, typename Schema, template <typename> typename Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
     struct for_each_field_impl;
 
-    template<typename F, typename t_schema, typename t_Predicate, size_t... S>
+    template<typename F, typename t_schema, template <typename> typename t_Predicate, size_t... S>
     struct for_each_field_impl<F, t_schema, t_Predicate, std::index_sequence<S...>>
     {
         static void foreach(F f)
@@ -500,21 +500,18 @@ namespace detail
             auto doThese =
             {
                 0,
-                (DoIf<t_Predicate::type<t_schema::field<S>::type>::value>::DoItVoid(f, t_schema::field<S>::type()), 0)...
+                (DoIf<t_Predicate<t_schema::field<S>::type>::value>::DoItVoid(f, t_schema::field<S>::type()), 0)...
             };
         }
     };
 #endif
 
-    struct true_predicate_type
-    {
-        template<typename T>
-        struct type: std::integral_constant<bool, true> {};
-    };
+    template<typename T>
+    struct true_predicate_type: std::true_type {};
 }
 
 // Iterate through matching fields
-template<typename t_schema, typename Predicate, typename F>
+template<typename t_schema, template <typename> typename Predicate, typename F>
 inline
 void for_each_field(F f)
 {
@@ -538,7 +535,7 @@ void for_each_field(F f)
 }
 
 // Iterate through matching fields, stopping when F returns true.
-template<typename t_schema, typename Predicate, typename F>
+template<typename t_schema, template <typename> typename Predicate, typename F>
 inline
 bool ForEachFieldStopOnTrue(F f)
 {

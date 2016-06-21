@@ -459,29 +459,11 @@ protected:
 };
 
 
-struct nested_predicate
-{
-    template<typename T>
-    struct type: is_nested_field<T> {};
-};
-
-struct container_predicate
-{
-    template<typename T>
-    struct type: is_container_field<T> {};
-};
-
 template<typename X>
 struct matching_predicate
 {
     template<typename T>
-    struct type: is_matching_field<X, T> {};
-};
-
-struct struct_predicate
-{
-    template<typename T>
-    struct type: is_struct_field<T> {};
+    struct test: is_matching_field<X, T> {};
 };
 
 } // namespace detail
@@ -529,7 +511,7 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::nested_predicate>([this, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<T>::type, is_nested_field>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
@@ -540,7 +522,7 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::matching_predicate<X>>([this, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::matching_predicate<X>::test>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
@@ -551,7 +533,7 @@ public:
     template <typename Reader>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::container_predicate>([this, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<T>::type, is_container_field>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
@@ -673,7 +655,7 @@ protected:
     template <typename V, typename X>
     bool AssignToNested(V& var, const PathView& ids, const X& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::struct_predicate>([this, &var, &ids, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, is_struct_field>([this, &var, &ids, &value](const auto &fieldType)
         {
             return AssignToNested(fieldType, var, ids, value);
         });
@@ -719,7 +701,7 @@ protected:
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::nested_predicate>([this, &var, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, is_nested_field>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
@@ -730,7 +712,7 @@ protected:
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::matching_predicate<X>>([this, &var, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::matching_predicate<X>::test>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
@@ -741,7 +723,7 @@ protected:
     template <typename Reader, typename V>
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::container_predicate>([this, &var, &id, &value](const auto &fieldType)
+        return ForEachFieldStopOnTrue<typename schema<V>::type, is_container_field>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
