@@ -103,9 +103,9 @@ namespace detail
             // are global static variables, and we can't depends on them being
             // initialized before the schema. Instead we initialize the schema
             // on the first call to Get().
-        // Note that older versions of GNU C++ don't handle rvalue argument
-        // forwarding in Boost call_once implementation so we are using
-        // the old trusty boost::bind.
+            // Note that older versions of GNU C++ don't handle rvalue argument
+            // forwarding in Boost call_once implementation so we are using
+            // the old trusty boost::bind.
             call_once(flag, boost::bind(&AppendStructDef, &schema));
             return schema;
         }
@@ -405,89 +405,6 @@ namespace detail
         }
     };
 
-#else
-    template<bool TCondition>
-    struct DoIf {
-        template<typename Func, typename TField>
-        static void DoItVoid(const Func &f)
-        {
-        }
-
-        template<typename Func, typename TField>
-        static bool DoItBool(const Func &)
-        {
-            return false;
-        }
-    };
-
-    template<>
-    struct DoIf<true>
-    {
-        template<typename Func, typename TField>
-        static void DoItVoid(const Func & f)
-        {
-            f(TField());
-        }
-
-        template<typename Func, typename TField>
-        static bool DoItBool(const Func & f)
-        {
-            return f(TField());
-        }
-    };
-
-    template<template <typename> typename Predicate, typename F>
-    struct ForEachHelper
-    {
-        ForEachHelper(F & theFunc): f(theFunc)
-        {}
-
-        template<typename TField>
-        void operator()()
-        {
-            DoIf<TField, Predicate<TField>::value>::DoIt(f);
-        }
-
-        F& f;
-    };
-
-    template<typename TSchema, template <typename> typename Predicate>
-    struct ForEachStopOnTrue
-    {
-        template<typename TFields, typename TFunc>
-        typename boost::disable_if<std::is_same<TFields, typename boost::mpl::end<TSchema::fields>::type>, bool>::type
-        DoField(const TFunc& f)
-        {
-            typedef typename boost::mpl::deref<TFields>::type currentField;
-
-            bool done = false;
-            if (Pred<currentField>::value)
-            {
-                done = f(currentField());
-            }
-
-            return done || DoField<boost::mpl::next<TFields>::type>(f);
-        }
-
-        template<typename TFields, typename TFunc>
-        typename boost::enable_if<std::is_same<TFields, typename boost::mpl::end<TSchema::fields>::type>, bool>::type
-        DoField(const TFunc& f)
-        {
-            return false;
-        }
-
-        template<typename Func>
-        bool operator()(const Func& f) const
-        {        
-            return DoField<mpl::begin<TSchema::fields>::type>(f);
-        }
-    };
-#endif
-
-
-#ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
-
-#else
     template<typename F, typename Schema, template <typename> typename Predicate, typename Seq = std::make_index_sequence<Schema::fieldCount>>
     struct for_each_field_impl;
 
@@ -504,7 +421,87 @@ namespace detail
             };
         }
     };
+
+#else
+    template<bool TCondition>
+    struct DoIf {
+        template<typename TField, typename Func>
+        static void DoItVoid(const Func &)
+        {
+        }
+
+        template<typename TField, typename Func>
+        static bool DoItBool(const Func &)
+        {
+            return false;
+        }
+    };
+
+    template<>
+    struct DoIf<true>
+    {
+        template<typename TField, typename Func>
+        static void DoItVoid(const Func & f)
+        {
+            f(TField());
+        }
+
+        template<typename TField, typename Func>
+        static bool DoItBool(const Func & f)
+        {
+            return f(TField());
+        }
+    };
+
+    template<template <typename> typename Predicate, typename F>
+    struct ForEachHelper
+    {
+        ForEachHelper(F & theFunc): f(theFunc)
+        {}
+
+        template<typename TField>
+        void operator()()
+        {
+            DoIf<Predicate>::DoItVoid<TField>(f);
+        }
+
+        F& f;
+    };
+
+    template<typename TSchema, template <typename> typename Predicate>
+    struct ForEachStopOnTrue
+    {
+        template<typename TFieldIter, typename Enabled = void>
+        struct DoFieldHelper
+        {
+            template<typename TFunc>
+            static bool DoField(const TFunc& f)
+            {
+                typedef typename boost::mpl::deref<TFieldIter>::type currentField;
+
+                bool result = DoIf<Predicate<currentField>::value>::DoItBool<currentField>(f);
+                return result || DoFieldHelper<boost::mpl::next<TFieldIter>::type>::DoField(f);
+            }
+        };
+
+        template<>
+        struct DoFieldHelper<boost::mpl::l_iter<boost::mpl::l_end>>
+        {
+            template<typename TFunc>
+            static bool DoField(const TFunc&)
+            {
+                return false;
+            }
+        };
+
+        template<typename Func>
+        bool operator()(const Func& f) const
+        {        
+            return DoFieldHelper<boost::mpl::begin<typename TSchema::fields>::type>::DoField(f);
+        }
+    };
 #endif
+
 
     template<typename T>
     struct true_predicate_type: std::true_type {};

@@ -282,8 +282,8 @@ bond::Metadata MetadataInit(const char* name, const char* qualified_name, const 
 
 const reflection::nothing nothing = {};
 
-#ifdef BOND_CXX11_NO_VARIADIC_TEMPLATES
-template <typename T, typename Iter> struct 
+#ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
+template <typename t_Fields, typename Iter> struct
 field_id
 {
     static const uint16_t value = boost::mpl::deref<Iter>::type::id;
@@ -297,7 +297,7 @@ field_id<T, typename boost::mpl::end<T>::type>
 };
 
 
-template <typename T, uint16_t minId = 0> struct 
+template <typename t_Fields, uint16_t minId = 0> struct 
 next_required_field
 {
 private:
@@ -310,7 +310,7 @@ private:
 
 public:
 
-    static const uint16_t value = field_id<T, typename boost::mpl::find_if<T, is_next_required<_> >::type>::value;
+    static const uint16_t value = field_id<t_Fields, typename boost::mpl::find_if<t_Fields, is_next_required<_> >::type>::value;
 };
 
 #else
@@ -376,9 +376,9 @@ struct any_required_fields<t_Schema, t_fieldToStartAt, std::index_sequence<S...>
 };
 #else
 
-template<typename t_Schema, size_t t_fieldToStartAt = 0>
+template<typename t_FieldList, size_t t_fieldToStartAt = 0>
 struct any_required_fields :
-    std::integral_constant<bool, next_required_field<typename t_Schema::fields, t_fieldToStartAt>::value != invalid_field_id> {};
+    std::integral_constant<bool, next_required_field<typename t_FieldList, t_fieldToStartAt>::value != invalid_field_id> {};
 
 #endif
 

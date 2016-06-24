@@ -353,6 +353,25 @@ protected:
             MissingFieldException();
     }
 
+    template <typename Schema>
+    typename boost::enable_if<any_required_fields<typename Schema::fields>>::type
+    Validate() const
+    {
+        if (_required != invalid_field_id)
+            MissingFieldException();
+    }
+
+    template <typename Head>
+    typename boost::disable_if<is_same<typename Head::field_modifier,
+                               reflection::required_field_modifier> >::type
+    Validate() const
+    {}
+
+
+    template <typename Schema>
+    typename boost::disable_if<any_required_fields<typename Schema::fields>>::type
+    Validate() const
+    {}
 #else
     template<typename TT = T>
     typename boost::enable_if<is_empty_struct<TT>>::type
@@ -367,9 +386,10 @@ protected:
         _required = next_required_field<typename schema<T>::type::field<0>::type>::value;
     }
 
+
     template <typename Head>
     typename boost::enable_if<is_same<typename Head::field_modifier,
-        reflection::required_field_modifier> >::type
+                              reflection::required_field_modifier> >::type
     Validate() const
     {
         if (_required == Head::id)
@@ -377,16 +397,6 @@ protected:
         else
             MissingFieldException();
     }
-#endif
-
-    template <typename Schema>
-    typename boost::enable_if_c<any_required_fields<Schema>::value>::type
-        Validate() const
-    {
-        if (_required != invalid_field_id)
-            MissingFieldException();
-    }
-
 
     template <typename Head>
     typename boost::disable_if<is_same<typename Head::field_modifier,
@@ -394,11 +404,20 @@ protected:
         Validate() const
     {}
 
+    template <typename Schema>
+    typename boost::enable_if<any_required_fields<typename Schema>>::type
+        Validate() const
+    {
+        if (_required != invalid_field_id)
+            MissingFieldException();
+    }
 
     template <typename Schema>
     typename boost::disable_if_c<any_required_fields<Schema>::value>::type
-        Validate() const
+    Validate() const
     {}
+
+#endif
 
 private:
     void MissingFieldException() const
@@ -511,33 +530,39 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<T>::type, is_nested_field>([this, &id, &value](const auto &fieldType)
+        ForEachFieldStopOnTrue<typename schema<T>::type, is_nested_field>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
         });
+
+        return false;
     }
 
 
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<T>::type, detail::matching_predicate<X>::test>([this, &id, &value](const auto &fieldType)
+        ForEachFieldStopOnTrue<typename schema<T>::type, detail::matching_predicate<X>::test>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
         });
+
+        return false;
     }
 
 
     template <typename Reader>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<T>::type, is_container_field>([this, &id, &value](const auto &fieldType)
+        ForEachFieldStopOnTrue<typename schema<T>::type, is_container_field>([this, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, id, value);
         });
+
+        return false;
     }
 
 
@@ -556,6 +581,7 @@ public:
 private:
     using detail::To::AssignToBase;
 
+    // Returns 'true' if the field was successfully assigned.
     template <typename TField, typename X>
     bool AssignToField(const TField&, uint16_t id, const X& value) const
     {
@@ -672,15 +698,6 @@ protected:
     }
 
 
-#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
-    template <typename V, typename X>
-    bool AssignToNested(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
-    {
-        return false;
-    }
-#endif
-
-
     template <typename BaseT, typename V, typename X>    
     bool AssignToBase(const BaseT*, V& var, const PathView& ids, const X& value) const
     {
@@ -701,33 +718,39 @@ protected:
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, is_nested_field>([this, &var, &id, &value](const auto &fieldType)
+        ForEachFieldStopOnTrue<typename schema<V>::type, is_nested_field>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
         });
+
+        return false;
     }
 
 
     template <typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, detail::matching_predicate<X>::test>([this, &var, &id, &value](const auto &fieldType)
+        ForEachFieldStopOnTrue<typename schema<V>::type, detail::matching_predicate<X>::test>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
         });
+
+        return false;
     }
 
 
     template <typename Reader, typename V>
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, is_container_field>([this, &var, &id, &value](const auto &fieldType)
+        ForEachFieldStopOnTrue<typename schema<V>::type, is_container_field>([this, &var, &id, &value](const auto &fieldType)
             -> bool
         {
             return AssignToField(fieldType, var, id, value);
         });
+
+        return false;
     }
 
 
@@ -737,7 +760,7 @@ protected:
         if (id == TField::id)
         {
             AssignToVar(TField::GetVariable(var), value);
-            return true;
+            return false;
         }
         else
         {

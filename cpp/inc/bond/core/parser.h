@@ -192,19 +192,8 @@ private:
     }
 
     // use runtime schema
-    void SkipFields(const RuntimeSchema& fields)
-    {
-        // Skip the structure by reading fields to Null transform
-        ReadFields(fields, Null());
-    }
 
-
-    bool
-    ReadRuntimeField(const RuntimeSchema& schema, const Transform& transform, const FieldDef& field)
-    {
-    }
-
-
+    // Returns 'true' if we should stop reading fields, false otherwise.
     template<typename Transform>
     bool
     ReadRuntimeField(const RuntimeSchema& schema, const Transform &transform, const FieldDef &field)
@@ -230,25 +219,41 @@ private:
     }
 
 
+    void SkipFields(const RuntimeSchema& fields)
+    {
+        // Skip the structure by reading fields to Null transform
+        ReadFields(fields, Null());
+    }
+
+
     template <typename Transform>
     bool
     ReadFields(const RuntimeSchema& schema, const Transform& transform)
     {
         bool done = false;
 
-        const_enumerator<std::vector<FieldDef> > enumerator(schema.GetStruct().fields);
-        while (enumerator.more() && !done)
-        {
-            const FieldDef& field = enumerator.next();
-            done = ReadRuntimeField(schema, transform, field);
-        }
-
-        // Skip trailing fields the transform didn't care about.
-        while (enumerator.more())
+        for (const_enumerator<std::vector<FieldDef> > enumerator(schema.GetStruct().fields); enumerator.more() && !done;)
         {
             const FieldDef& field = enumerator.next();
 
-            ReadRuntimeField(schema, Null(), field);
+            if (detail::ReadFieldOmitted(_input))
+            {
+                transform.OmittedField(field.id, field.metadata, field.type.id);
+                continue;
+            }
+
+            if (field.type.id == bond::BondDataType::BT_STRUCT)
+            {
+                done = transform.Field(field.id, field.metadata, bonded<void, Input>(_input, RuntimeSchema(schema, field)));
+            }
+            else if (field.type.id == bond::BondDataType::BT_LIST || field.type.id == bond::BondDataType::BT_SET || field.type.id == bond::BondDataType::BT_MAP)
+            {
+                done = transform.Field(field.id, field.metadata, value<void, Input>(_input, RuntimeSchema(schema, field)));
+            }
+            else
+            {
+                done = detail::BasicTypeField(field.id, field.metadata, field.type.id, transform, _input);
+            }
         }
 
         return done;
@@ -297,7 +302,7 @@ protected:
 
 
 private:
-    uint16_t     _id = invalid_field_id;
+    uint16_t     _id;
     BondDataType _type;
 
     template <typename Transform>
@@ -387,7 +392,7 @@ private:
         _input.ReadFieldEnd();
     }
 
- 
+
     template <typename T, typename Transform>
     typename boost::enable_if_c<is_nested_field<T>::value
                             && !is_fast_path_field<T, Transform>::value, bool>::type

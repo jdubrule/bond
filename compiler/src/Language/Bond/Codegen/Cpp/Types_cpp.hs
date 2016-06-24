@@ -21,11 +21,6 @@ types_cpp cpp file _imports declarations = ("_types.cpp", [lt|
 #include "#{file}_reflection.h"
 #include <bond/core/exception.h>
 
-#if defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX) || 1
-#include <boost/assign.hpp>
-#include <boost/assign/list_of.hpp>
-#endif
-
 #{CPP.openNamespace cpp}
     #{doubleLineSepEnd 1 statics declarations}
 #{CPP.closeNamespace cpp}

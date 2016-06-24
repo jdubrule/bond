@@ -73,52 +73,39 @@ inline const Base& base_cast(const T& obj)
     return static_cast<const Base&>(obj);
 }
 
-#ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
-#else
-template<typename C, typename TSchema, typename Seq = std::make_index_sequence<TSchema::fieldCount>>
-struct FieldIterate;
-
-template<typename C, typename TSchema, size_t... S>
-struct FieldIterate<C, TSchema, std::index_sequence<S...>>
+template<typename TSchema>
+struct FieldIterate
 {
-    static bool DoFieldIterate(const C &caller)
+    template<typename C>
+    struct PerFieldCallback
+    {
+        explicit PerFieldCallback(C& caller):
+            m_caller(caller)
+        {
+        }
+
+        template<typename TField>
+        bool operator()(const TField&) const
+        {
+            return m_caller.DoField<TField>();
+        }
+
+        C& m_caller;
+    };
+
+    template<typename C>
+    static bool DoFieldIterate(C &caller)
     {
         caller.BeginFields();
 
-        bool done = false;
-        auto runThese = {
-            false,
-            done = !done && caller.DoField<TSchema::field<S>::type>()...
-        };
+        PerFieldCallback<C> callbackLambda(caller);
+        bool done = ForEachFieldStopOnTrue<TSchema>(callbackLambda);
 
         caller.EndFields();
 
         return done;
     }
 };
-
-template<typename C, typename TSchema, typename Seq = std::make_index_sequence<TSchema::fieldCount>>
-struct FieldIterate;
-
-template<typename C, typename TSchema, size_t... S>
-struct FieldIterate<C, TSchema, std::index_sequence<S...>>
-{
-    static bool DoFieldIterate(const C &caller)
-    {
-        caller.BeginFields();
-
-        bool done = false;
-        auto runThese = {
-            false,
-            done = !done && caller.DoField<TSchema::field<S>::type>()...
-        };
-
-        caller.EndFields();
-
-        return done;
-    }
-};
-#endif
 
 template <typename Input, typename Parser>
 class ParserInheritance
@@ -183,7 +170,6 @@ protected:
         Parser * m_parser;
     };
 
-
     template <typename T, typename Transform>
     typename boost::disable_if_c<(hierarchy_depth<T>::value > expected_depth<Transform>::value), bool>::type
     Read(const T&, const Transform& transform)
@@ -194,7 +180,8 @@ protected:
         transform.Begin(T::metadata);
         ReadBase(base_class<T>(), transform);
 
-        bool result = FieldIterate<ReadTheFields<Transform>, T>::DoFieldIterate(ReadTheFields<Transform>(transform, _input, static_cast<Parser*>(this)));
+        ReadTheFields<Transform> rtf(transform, _input, static_cast<Parser*>(this));
+        bool result = FieldIterate<T>::DoFieldIterate(rtf);
 
         transform.End();
         return result;

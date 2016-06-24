@@ -24,6 +24,11 @@ reflection_h cpp file imports declarations = ("_reflection.h", [lt|
 
 #include "#{file}_types.h"
 #include <bond/core/reflection.h>
+#if defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX) || 1
+#include <boost/assign.hpp>
+#include <boost/assign/list_of.hpp>
+#endif
+
 #{newlineSepEnd 0 include imports}
 #{CPP.openNamespace cpp}
     #{doubleLineSepEnd 1 schema declarations}
