@@ -54,10 +54,13 @@ verifyApplyCodegen args baseName =
     protocols =
         [ Protocol "bond::CompactBinaryReader<bond::InputBuffer>"
                    "bond::CompactBinaryWriter<bond::OutputBuffer>"
+                   "BOND_COMPACT_BINARY_PROTOCOL"
         , Protocol "bond::FastBinaryReader<bond::InputBuffer>"
                    "bond::FastBinaryWriter<bond::OutputBuffer>"
+                   "BOND_FAST_BINARY_PROTOCOL"
         , Protocol "bond::SimpleBinaryReader<bond::InputBuffer>"
                    "bond::SimpleBinaryWriter<bond::OutputBuffer>"
+                   "BOND_SIMPLE_BINARY_PROTOCOL"
         ]
 
 
