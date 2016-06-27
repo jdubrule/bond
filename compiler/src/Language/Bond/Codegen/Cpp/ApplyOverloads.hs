@@ -18,6 +18,7 @@ data Protocol =
     Protocol
     { protocolReader :: String -- ^ Name of the class implementing the protocol reader.
     , protocolWriter :: String -- ^ Name of the class implementing the protocol writer.
+    , protocolPreprocessorSwitch :: String -- ^ Name of the BOND_*_PROTOCOL define that gates inclusion of this protocol
     }
 
 
@@ -36,9 +37,11 @@ applyOverloads protocols attr body Struct {..} | null declParams = [lt|
                const #{declName}& value)#{body}
     #{newlineSep 1 applyOverloads' protocols}|]
   where
-    applyOverloads' p = [lt|#{deserialization p}
+    applyOverloads' p = [lt|#ifdef #{protocolPreprocessorSwitch p}
+    #{deserialization p}
     #{serialization serializer p}
-    #{serialization marshaler p}|]
+    #{serialization marshaler p}
+    #endif // #{protocolPreprocessorSwitch p}|]
 
     serializer = "Serializer" :: String
     marshaler = "Marshaler" :: String
@@ -58,8 +61,10 @@ applyOverloads protocols attr body Struct {..} | null declParams = [lt|
                const bond::bonded<#{declName}>& value)#{body}
     #{newlineSep 1 (transcoding transform) protocols}|]
       where
-        transcoding transform' Protocol {protocolReader = fromReader} = [lt|
+        transcoding transform' Protocol {protocolReader = fromReader, protocolPreprocessorSwitch = fromPreprocessorSwitch} = [lt|
+    #ifdef #{fromPreprocessorSwitch}
     #{attr}bool Apply(const bond::#{transform'}<#{protocolWriter} >& transform,
-               const bond::bonded<#{declName}, #{fromReader}&>& value)#{body}|]
+               const bond::bonded<#{declName}, #{fromReader}&>& value)#{body}
+    #endif|]
 
 applyOverloads _ _ _ _ = mempty

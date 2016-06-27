@@ -160,6 +160,7 @@ use_container_allocator_for_elements<T, typename boost::enable_if<
 template <typename T> struct
 use_container_allocator_for_elements<T, typename boost::enable_if_c<
     has_schema<typename element_type<T>::type>::value
+ && std::is_class<typename element_type<T>::type::allocator_type>::value
  && !is_same<typename T::allocator_type::template rebind<int>::other, 
              std::allocator<int> >::value>::type>
     : true_type {};
@@ -320,6 +321,7 @@ use_map_allocator_for_values<T, typename boost::enable_if<
 template <typename T> struct
 use_map_allocator_for_values<T, typename boost::enable_if_c<
     has_schema<typename element_type<T>::type::second_type>::value
+ && std::is_class<typename element_type<T>::type::allocator_type>::value
  && !is_same<typename T::allocator_type::template rebind<int>::other, 
              std::allocator<int> >::value>::type>
     : true_type {};

@@ -453,7 +453,7 @@ namespace detail
         }
     };
 
-    template<template <typename> typename Predicate, typename F>
+    template<template <typename> class t_Predicate, typename F>
     struct ForEachHelper
     {
         ForEachHelper(F & theFunc): f(theFunc)
@@ -462,13 +462,13 @@ namespace detail
         template<typename TField>
         void operator()()
         {
-            DoIf<Predicate>::DoItVoid<TField>(f);
+            DoIf<t_Predicate>::DoItVoid<TField>(f);
         }
 
         F& f;
     };
 
-    template<typename TSchema, template <typename> typename Predicate>
+    template<typename TSchema, template <typename> class Predicate>
     struct ForEachStopOnTrue
     {
         template<typename TFieldIter, typename Enabled = void>
@@ -508,7 +508,7 @@ namespace detail
 }
 
 // Iterate through matching fields
-template<typename t_schema, template <typename> typename Predicate, typename F>
+template<typename t_schema, template <typename> class Predicate, typename F>
 inline
 void for_each_field(F f)
 {
@@ -532,7 +532,7 @@ void for_each_field(F f)
 }
 
 // Iterate through matching fields, stopping when F returns true.
-template<typename t_schema, template <typename> typename Predicate, typename F>
+template<typename t_schema, template <typename> class Predicate, typename F>
 inline
 bool ForEachFieldStopOnTrue(F f)
 {

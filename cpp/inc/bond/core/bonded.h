@@ -136,6 +136,8 @@ public:
         _schema = rhs._schema;
         _skip = rhs._skip;
         _base = rhs._base;
+
+        return *this;
     }
 #else
     bonded& operator=(const bonded& rhs) = default;

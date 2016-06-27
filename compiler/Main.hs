@@ -82,11 +82,14 @@ cppCodegen options@Cpp {..} = do
     enabled a p = null a || fst p `elem` a
     protocols =
         [ (Compact, Protocol "bond::CompactBinaryReader<bond::InputBuffer>"
-                             "bond::CompactBinaryWriter<bond::OutputBuffer>")
+                             "bond::CompactBinaryWriter<bond::OutputBuffer>"
+                             "BOND_COMPACT_BINARY_PROTOCOL")
         , (Fast,    Protocol "bond::FastBinaryReader<bond::InputBuffer>"
-                             "bond::FastBinaryWriter<bond::OutputBuffer>")
+                             "bond::FastBinaryWriter<bond::OutputBuffer>"
+                             "BOND_FAST_BINARY_PROTOCOL")
         , (Simple,  Protocol "bond::SimpleBinaryReader<bond::InputBuffer>"
-                             "bond::SimpleBinaryWriter<bond::OutputBuffer>")
+                             "bond::SimpleBinaryWriter<bond::OutputBuffer>"
+                             "BOND_SIMPLE_BINARY_PROTOCOL")
         ]
 cppCodegen _ = error "cppCodegen: impossible happened."
 

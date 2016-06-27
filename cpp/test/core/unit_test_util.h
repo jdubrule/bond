@@ -354,12 +354,13 @@ is_optional_field
 };
 
 #if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
+using boost::mpl::_;
+
 template<typename t_schema>
 struct has_optional_fields
 {
-    using boost::mpl::_;
     static const bool value = (boost::mpl::count_if<typename t_schema::fields, is_optional_field<_> >::value != 0);
-}
+};
 #else
 template<typename t_schema, typename Seq = std::make_index_sequence<t_schema::fieldCount>>
 struct has_optional_fields;

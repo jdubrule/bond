@@ -595,30 +595,32 @@ private:
     mutable bool _skip;
 };
 
-
-template <typename X, typename I, typename T>
-typename boost::enable_if<require_modify_element<X> >::type 
-inline DeserializeElement(X& var, const I& item, const T& element)
+namespace detail
 {
-    struct Deserialize
+    template<typename T>
+    struct DeserializeElementHelper
     {
-        Deserialize(const T& element)
-            : element(element)
+        DeserializeElementHelper(const T& element)
+            : m_element(element)
         {}
 
-#ifndef BOOST_NO_CXX11_DELETED_FUNCTIONS
-        Deserialize & operator=(const Deserialize&) = delete;
-#endif
-
-        void operator()(typename element_type<X>::type& e)
+        template<typename X>
+        void operator()(X& e)
         {
-            this->element.Deserialize(e);
+            m_element.Deserialize(e);
         }
 
-        const T& element;
-    };
+        const T& m_element;
 
-    modify_element(var, item, Deserialize(element));
+        BOOST_DELETED_FUNCTION(DeserializeElementHelper& operator=(const DeserializeElementHelper&));
+    };
+}
+
+template <typename X, typename I, typename T>
+typename boost::enable_if<require_modify_element<X> >::type
+inline DeserializeElement(X& var, const I& item, const T& element)
+{
+    modify_element(var, item, detail::DeserializeElementHelper<T>(element));
 }
 
 

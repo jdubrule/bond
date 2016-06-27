@@ -523,6 +523,29 @@ public:
         return AssignToBase(_var, value);
     }
 
+    // Lambda-a-like to assign the field
+    template<typename TValue>
+    struct DoFieldAssign
+    {
+        DoFieldAssign(const To<T, Validator> * toThis, uint16_t id, const TValue & value):
+            m_this(toThis),
+            m_id(id),
+            m_value(value)
+        {}
+
+        template<typename TField>
+        bool operator()(const TField & fieldType) const
+        {
+            return m_this->AssignToField(fieldType, m_id, m_value);
+        }
+
+        const To<T, Validator> * m_this;
+        const uint16_t m_id;
+        const TValue & m_value;
+
+        BOOST_DELETED_FUNCTION(DoFieldAssign& operator=(const DoFieldAssign&));
+    };
+
 
     // Separate Field overloads for bonded<T>, basic types and containers allows us to use
     // simpler predicates. This doesn't matter for runtime code but
@@ -530,37 +553,28 @@ public:
     template <typename Reader, typename X>
     bool Field(uint16_t id, const Metadata& /*metadata*/, const bonded<X, Reader>& value) const
     {
-        ForEachFieldStopOnTrue<typename schema<T>::type, is_nested_field>([this, &id, &value](const auto &fieldType)
-            -> bool
-        {
-            return AssignToField(fieldType, id, value);
-        });
+        DoFieldAssign<bonded<X, Reader>> dfa(this, id, value);
+        ForEachFieldStopOnTrue<typename schema<T>::type, is_nested_field>(dfa);
 
         return false;
     }
 
 
     template <typename Reader, typename X>
-    bool Field(uint16_t id, const Metadata& /*metadata*/, const value<X, Reader>& value) const
+    bool Field(uint16_t id, const Metadata& /*metadata*/, const bond::value<X, Reader>& value) const
     {
-        ForEachFieldStopOnTrue<typename schema<T>::type, detail::matching_predicate<X>::test>([this, &id, &value](const auto &fieldType)
-            -> bool
-        {
-            return AssignToField(fieldType, id, value);
-        });
+        DoFieldAssign<bond::value<X, Reader>> dfa(this, id, value);
+        ForEachFieldStopOnTrue<typename schema<T>::type, detail::matching_predicate<X>::test>(dfa);
 
         return false;
     }
 
 
     template <typename Reader>
-    bool Field(uint16_t id, const Metadata& /*metadata*/, const value<void, Reader>& value) const
+    bool Field(uint16_t id, const Metadata& /*metadata*/, const bond::value<void, Reader>& value) const
     {
-        ForEachFieldStopOnTrue<typename schema<T>::type, is_container_field>([this, &id, &value](const auto &fieldType)
-            -> bool
-        {
-            return AssignToField(fieldType, id, value);
-        });
+        DoFieldAssign<bond::value<void, Reader>> dfa(this, id, value);
+        ForEachFieldStopOnTrue<typename schema<T>::type, is_container_field>(dfa);
 
         return false;
     }

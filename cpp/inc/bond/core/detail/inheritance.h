@@ -91,6 +91,8 @@ struct FieldIterate
         }
 
         C& m_caller;
+
+        BOOST_DELETED_FUNCTION(PerFieldCallback& operator=(const PerFieldCallback&));
     };
 
     template<typename C>
@@ -168,6 +170,8 @@ protected:
         const TTransform & m_transform;
         Input & _input;
         Parser * m_parser;
+
+        BOOST_DELETED_FUNCTION(ReadTheFields& operator=(const ReadTheFields&));
     };
 
     template <typename T, typename Transform>
