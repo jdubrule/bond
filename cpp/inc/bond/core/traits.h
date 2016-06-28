@@ -64,11 +64,7 @@ template <typename T, typename Enable = void> struct
 schema;
 
 template <typename T> struct
-#if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
-    schema<T, typename boost::enable_if<is_class<typename T::Schema::fields>>::type>
-#else
-    schema<T, typename boost::enable_if_c<is_class<typename T::Schema>::value && std::is_same<const size_t, decltype(typename T::Schema::fieldCount)>::value>::type>
-#endif
+    schema<T, typename boost::enable_if<is_class<typename T::Schema::base>>::type>
 {
     typedef typename T::Schema type;
 };
