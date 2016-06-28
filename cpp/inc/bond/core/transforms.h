@@ -690,15 +690,38 @@ protected:
         else
             return AssignToNested(var, ids, value);
     }
+
+    template<typename V, typename X>
+    struct AssignToNestedLambda
+    {
+        AssignToNestedLambda(const MapTo * myThis, V& var, const PathView& ids, const X& val):
+            m_this(myThis),
+            m_var(var),
+            m_ids(ids),
+            m_value(val)
+        {}
+
+        template<typename TField>
+        bool operator()(const TField & fieldType) const
+        {
+            return m_this->AssignToNested(fieldType, m_var, m_ids, m_value);
+        }
+
+        const MapTo * m_this;
+        V& m_var;
+        const PathView &m_ids;
+        const X& m_value;
+    };
     
     
     template <typename V, typename X>
     bool AssignToNested(V& var, const PathView& ids, const X& value) const
     {
-        return ForEachFieldStopOnTrue<typename schema<V>::type, is_struct_field>([this, &var, &ids, &value](const auto &fieldType)
-        {
-            return AssignToNested(fieldType, var, ids, value);
-        });
+        return ForEachFieldStopOnTrue<typename schema<V>::type, is_struct_field>(AssignToNestedLambda<V, X>(this, var, ids, value));
+//         [this, &var, &ids, &value](const auto &fieldType)
+//         {
+//             return AssignToNested(fieldType, var, ids, value);
+//         }
     }
 
 
@@ -725,51 +748,60 @@ protected:
         return false;
     }
 
+    template<typename TVar, typename TValue>
+    struct AssignToFieldLambda
+    {
+        AssignToFieldLambda(TVar & var, const uint16_t id, const TValue & val):
+            m_var(var),
+            m_id(id),
+            m_value(val)
+        {}
 
+        template<typename TField>
+        bool operator()(const TField & fieldType) const
+        {
+            return AssignToField(fieldType, m_var, m_id, m_value);
+        }
+
+        TVar & m_var;
+        const uint16_t m_id;
+        const TValue & m_value;
+
+        BOOST_DELETED_FUNCTION(AssignToFieldLambda& operator=(const AssignToFieldLambda&));
+    };
+    
     // Separate AssignToField overloads for bonded<T>, basic types and containers allows us 
     // to use simpler predicates in boost::mpl::copy_if. This doesn't matter for runtime code
     // but compiles significantly faster.
     template <typename Reader, typename V, typename X>
-    bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
+    static bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value)
     {
-        ForEachFieldStopOnTrue<typename schema<V>::type, is_nested_field>([this, &var, &id, &value](const auto &fieldType)
-            -> bool
-        {
-            return AssignToField(fieldType, var, id, value);
-        });
+        ForEachFieldStopOnTrue<typename schema<V>::type, is_nested_field>(AssignToFieldLambda<V, bonded<X, Reader>>(var, id, value));
 
         return false;
     }
 
 
     template <typename Reader, typename V, typename X>
-    bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
+    static bool AssignToField(V& var, uint16_t id, const value<X, Reader>& val)
     {
-        ForEachFieldStopOnTrue<typename schema<V>::type, detail::matching_predicate<X>::test>([this, &var, &id, &value](const auto &fieldType)
-            -> bool
-        {
-            return AssignToField(fieldType, var, id, value);
-        });
+        ForEachFieldStopOnTrue<typename schema<V>::type, detail::matching_predicate<X>::test>(AssignToFieldLambda<V, bond::value<X, Reader>>(var, id, val));
 
         return false;
     }
 
 
     template <typename Reader, typename V>
-    bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
+    static bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value)
     {
-        ForEachFieldStopOnTrue<typename schema<V>::type, is_container_field>([this, &var, &id, &value](const auto &fieldType)
-            -> bool
-        {
-            return AssignToField(fieldType, var, id, value);
-        });
+        ForEachFieldStopOnTrue<typename schema<V>::type, is_container_field>(AssignToFieldLambda<V, bond::value<void, Reader>>(var, id, value));
 
         return false;
     }
 
 
     template <typename TField, typename V, typename X>
-    bool AssignToField(const TField&, V& var, uint16_t id, const X& value) const
+    static bool AssignToField(const TField&, V& var, uint16_t id, const X& value)
     {
         if (id == TField::id)
         {
@@ -783,14 +815,14 @@ protected:
     }
 
     template <typename V, typename X>
-    void AssignToVar(V& var, const X& value) const
+    static void AssignToVar(V& var, const X& value)
     {
         value.Deserialize(var);
     }
 
     
     template <typename V, typename X>
-    void AssignToVar(maybe<V>& var, const X& value) const
+    static void AssignToVar(maybe<V>& var, const X& value)
     {
         value.Deserialize(var.set_value());
     }

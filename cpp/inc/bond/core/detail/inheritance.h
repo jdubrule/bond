@@ -119,6 +119,21 @@ protected:
           _base(base)
     {}
 
+    struct SkipLambda
+    {
+        SkipLambda(Parser* myThis) :
+            m_this(myThis)
+        {}
+
+        template<typename TField>
+        void operator()(const TField& field) const
+        {
+            m_this->SkipOneField(field);
+        }
+
+        Parser* m_this;
+    };
+
     // use compile-time schema
     template <typename T, typename Transform>
     typename boost::enable_if_c<(hierarchy_depth<T>::value > expected_depth<Transform>::value), bool>::type
@@ -136,7 +151,8 @@ protected:
 
         detail::StructEnd(_input, true);
 
-        for_each_field<T>([this](auto field) { static_cast<Parser*>(this)->SkipOneField(field); });
+        SkipLambda skipper(static_cast<Parser*>(this));
+        for_each_field<T>(skipper);
 
         return result;
     }
