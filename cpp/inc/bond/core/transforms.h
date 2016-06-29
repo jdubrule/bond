@@ -457,7 +457,6 @@ struct AssignToFirstMatching<T, Pred, std::index_sequence<S...>>
         {
             false,
             done = !done && DoIf<Pred::type<typename Schema::field<S>::type>::value>::DoItBool(f, Schema::field<S>::type())...
-//			(DoIf<Schema::field<S>::type, Pred::type<Schema::field<S>::type>::value>::DoIt([&done, &f](const auto& field) { done = !done && f(field); }) , false)...
         };
 
         return done;
@@ -490,10 +489,6 @@ struct struct_predicate
     using type = is_struct_field<T>;
 };
 
-<<<<<<< 73225934422c9262a71e93494a1b0d93cb829af4
-
-=======
->>>>>>> Convert for_each_field to take a predicate
 } // namespace detail
 
 

@@ -57,7 +57,7 @@ void TranscodingTest(uint16_t version = bond::v1)
 
         {
             bond::InputBuffer input(simple_buffer.GetBuffer());
-	    Factory<Writer>::Call(writer_buffer, version, boost::bind(
+        Factory<Writer>::Call(writer_buffer, version, boost::bind(
                  bond::SelectProtocolAndApply<T, bond::InputBuffer, bond::Marshaler<Writer> >, input, boost::bind(bond::MarshalTo<Writer>, _1)));
         }
 
@@ -75,7 +75,7 @@ void TranscodingTest(uint16_t version = bond::v1)
 
         {
             bond::InputBuffer input(simple_buffer.GetBuffer());
-	    Factory<Writer>::Call(writer_buffer, version, boost::bind(
+        Factory<Writer>::Call(writer_buffer, version, boost::bind(
                  bond::SelectProtocolAndApply<bond::InputBuffer, bond::Marshaler<Writer> >, bond::GetRuntimeSchema<T>(), input, boost::bind(bond::MarshalTo<Writer>, _1)));
         }
 

@@ -173,12 +173,12 @@ struct StructWithNullables
     2: required_optional   nullable<list<float>>       nullable_list;
     3: required_optional   nullable<SimpleStruct>      nullable_struct;
     4: required_optional   nullable<map<int8, int8>>   nullable_map;
-	5: required_optional   nullable<string>            nullable_string;
-	10: required_optional  nullable<nullable<uint32>>            nullable_nullable_uint32;
+    5: required_optional   nullable<string>            nullable_string;
+    10: required_optional  nullable<nullable<uint32>>            nullable_nullable_uint32;
     20: required_optional  nullable<nullable<list<float>>>       nullable_nullable_list;
     30: required_optional  nullable<nullable<SimpleStruct>>      nullable_nullable_struct;
     40: required_optional  nullable<nullable<map<int8, int8>>>   nullable_nullable_map;
-	50: required_optional  nullable<nullable<string>>            nullable_nullable_string;
+    50: required_optional  nullable<nullable<string>>            nullable_nullable_string;
     60: required_optional  nullable<bonded<SimpleStruct>>        nullable_bonded;
 };
 

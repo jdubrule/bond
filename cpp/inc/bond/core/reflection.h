@@ -328,7 +328,7 @@ namespace detail
         static const uint16_t currentFieldId = t_Schema::field<t_currentFieldIndex::value>::type::id;
         static const bool currentFieldIsRequired = std::is_same<t_Schema::field<t_currentFieldIndex::value>::type::field_modifier, reflection::required_field_modifier>::value;
 
-	public:
+    public:
         static const uint16_t value = currentFieldId >= minId && currentFieldIsRequired ?
             currentFieldId
             : next_required_field_helper<t_Schema, std::integral_constant<size_t, t_currentFieldIndex::value + 1>, minId>::value;

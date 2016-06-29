@@ -103,9 +103,9 @@ namespace detail
             // are global static variables, and we can't depends on them being
             // initialized before the schema. Instead we initialize the schema
             // on the first call to Get().
-	    // Note that older versions of GNU C++ don't handle rvalue argument
-	    // forwarding in Boost call_once implementation so we are using
-	    // the old trusty boost::bind. 
+        // Note that older versions of GNU C++ don't handle rvalue argument
+        // forwarding in Boost call_once implementation so we are using
+        // the old trusty boost::bind.
             call_once(flag, boost::bind(&AppendStructDef, &schema));
             return schema;
         }

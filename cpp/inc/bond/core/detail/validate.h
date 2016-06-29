@@ -44,7 +44,7 @@ inline bool ValidateType(BondDataType src, BondDataType dst)
         case BondDataType::BT_FLOAT:
             return (dst == BondDataType::BT_DOUBLE);
 
-	default:
+    default:
             break;
     }
 
