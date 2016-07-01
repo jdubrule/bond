@@ -273,7 +273,8 @@ class DynamicParser
 {
 public:
     DynamicParser(Input input, bool base)
-        : detail::ParserInheritance<Input, DynamicParser<Input> >(input, base)
+        : detail::ParserInheritance<Input, DynamicParser<Input> >(input, base),
+        _id(invalid_field_id)
     {}
 
     
