@@ -250,6 +250,26 @@ struct DoProtocolApply<Buffer, ProtocolList<P...>>
 
 #endif // BOND_NO_CXX11_VARIADIC_TEMPLATES
 
+template<typename T, typename Buffer, typename Transform>
+struct ApplyLambdaCompileTimeSchema
+{
+    ApplyLambdaCompileTimeSchema(Buffer & buf, const Transform & xform):
+        m_buffer(buf),
+        m_transform(xform)
+    {}
+
+    template<typename TReader>
+    bool operator()(TReader & reader) const
+    {
+        TReader::type reader(m_buffer);
+        return Apply(m_transform, bonded<T, TReader&>(reader));
+    }
+
+private:
+    Buffer & m_buffer;
+    const Transform & m_transform;
+};
+
 template <typename T, typename Buffer, typename Transform>
 inline bool ApplyMatchingProtocol(
     Buffer& input,
@@ -264,14 +284,31 @@ inline bool ApplyMatchingProtocol(
         protocol
         );
 #else
-    return DoProtocolApply<Buffer>(protocol, [&input, &transform, &result](auto & readerType)
-    {
-        decltype(readerType)::type reader(input);
-        return Apply(transform, bonded<T, Reader&>(reader));
-    });
+    return DoProtocolApply<Buffer>(protocol, ApplyLambdaCompileTimeSchema(input, transform));
 #endif
 }
 
+template<typename Buffer, typename Transform>
+struct ApplyLambdaRuntimeSchema
+{
+    ApplyLambdaRuntimeSchema(Buffer & buf, const Transform & xform, const RuntimeSchema& schema) :
+        m_buffer(buf),
+        m_transform(xform),
+        m_schema(schema)
+    {}
+
+    template<typename TReader>
+    bool operator()(TReader & reader) const
+    {
+        TReader::type reader(m_buffer);
+        return Apply(m_transform, bonded<void, TReader&>(reader));
+    }
+
+private:
+    Buffer & m_buffer;
+    const Transform & m_transform;
+    const RuntimeSchema &m_schema;
+};
 
 template <typename Buffer, typename Transform>
 inline bool ApplyMatchingProtocol(
@@ -289,14 +326,30 @@ inline bool ApplyMatchingProtocol(
         protocol
         );
 #else
-    return DoProtocolApply<Buffer>(protocol, [&input, &transform, &schema, &result](autreaderType)
-    {
-        decltype(readerType)::type reader(input);
-        result = Apply(transform, bonded<void, Reader&>(reader, schema));
-    });
+    return DoProtocolApply<Buffer>(protocol, ApplyLambdaRuntimeSchema(input, transform, schema));
 #endif
 }
 
+
+template<typename T, typename Buffer>
+struct ApplyWriteLambda
+{
+    ApplyWriteLambda(const T& val, Buffer & buf):
+        m_value(val),
+        m_buffer(buf)
+    {}
+
+    template<typename TReader>
+    bool operator()(TReader &) const
+    {
+        TReader::type::Writer writer(m_buffer);
+        return Apply(Transform<decltype(writer)>(writer), m_value);
+    }
+
+private:
+    const T& m_value;
+    Buffer & m_buffer;
+};
 
 template <template <typename Writer> class Transform, typename Buffer, typename T>
 inline bool ApplyMatchingProtocol(
@@ -311,11 +364,7 @@ inline bool ApplyMatchingProtocol(
         output,
         protocol);
 #else
-    return DoProtocolApply<Buffer>(protocol, [&output, &value, &result](auto & readerType)
-    {
-        decltype(readerType)::type::Writer writer(output);
-        result = Apply(Transform<decltype(writer)>(writer), value);
-    });
+    return DoProtocolApply<Buffer>(protocol, ApplyWriteLambda(value, output));
 #endif
 }
 
