@@ -21,43 +21,50 @@
         BOND_TOKEN:
             secure: 30K3L1s8erWFnnS/Iyb2LP7kiGZBr/GzA24Y82mCsGMBjzSUyk7uV7MvZ3NepNvB
         matrix:
+            - BOND_BUILD: Doc
             - BOND_BUILD: Python
               BOND_VS: "Visual Studio 14 2015"
-              BOND_BOOST: 59
+              BOND_VS_NUM: 14
+              BOND_ARCH: 32
+              BOND_BOOST: 60
             - BOND_BUILD: C++
-              BOND_VS: "Visual Studio 14 2015 Win64"
-              BOND_BOOST: 59
+              BOND_VS: "Visual Studio 14 2015"
+              BOND_VS_NUM: 14
+              BOND_ARCH: 64
+              BOND_BOOST: 60
             - BOND_BUILD: C#
               BOND_OUTPUT: Properties
               BOND_CONFIG: Debug
-            - BOND_BUILD: Doc
             - BOND_BUILD: C++
               BOND_VS: "Visual Studio 12 2013"
-              BOND_BOOST: 55
+              BOND_VS_NUM: 12
+              BOND_ARCH: 32
+              BOND_BOOST: 58
+              BOND_CMAKE_FLAGS: "-DBOND_CORE_ONLY=TRUE;-DBOND_SKIP_GBC_TESTS=TRUE"
+            - BOND_BUILD: C++
+              BOND_VS: "Visual Studio 12 2013"
+              BOND_VS_NUM: 12
+              BOND_ARCH: 64
+              BOND_BOOST: 58
+              BOND_CMAKE_FLAGS: "-DBOND_SKIP_CORE_TESTS=TRUE;-DBOND_SKIP_GBC_TESTS=TRUE"
             - BOND_BUILD: C#
               BOND_OUTPUT: Fields
               BOND_CONFIG: Fields
+            - BOND_BUILD: "C# .NET Core"
+              BOND_CONFIG: Debug
 
     install:
         - ps: >-
             git submodule update --init
 
-            if ($env:BOND_BUILD -eq "Python") {
-
-                if (!(Test-Path boost.exe)) {
-
-                    echo "Downloading Boost 1.${env:BOND_BOOST} ..."
-
-                    Start-FileDownload "http://iweb.dl.sourceforge.net/project/boost/boost-binaries/1.${env:BOND_BOOST}.0/boost_1_${env:BOND_BOOST}_0-msvc-14.0-32.exe" -FileName boost.exe -Timeout 1200000
-
-                }
-
-                .\boost.exe /DIR="${env:APPVEYOR_BUILD_FOLDER}\\boost_1_${env:BOND_BOOST}_0" /VERYSILENT
-
-                $env:BOOST_ROOT = "${env:APPVEYOR_BUILD_FOLDER}/boost_1_${env:BOND_BOOST}_0"
-
-                $env:BOOST_LIBRARYDIR = "${env:BOOST_ROOT}/lib32-msvc-14.0"
-
+            if ($env:BOND_BOOST -eq 56) {
+                # Hard-coded Boost path per https://www.appveyor.com/docs/installed-software#languages-libraries-frameworks
+                $env:BOOST_ROOT = "C:/Libraries/boost"
+                $env:BOOST_LIBRARYDIR = "C:/Libraries/boost/lib${env:BOND_ARCH}-msvc-${env:BOND_VS_NUM}.0"
+            }
+            else {
+                $env:BOOST_ROOT = "C:/Libraries/boost_1_${env:BOND_BOOST}_0"
+                $env:BOOST_LIBRARYDIR = "C:/Libraries/boost_1_${env:BOND_BOOST}_0/lib${env:BOND_ARCH}-msvc-${env:BOND_VS_NUM}.0"
             }
 
             choco install haskellplatform -version 2014.2.0.0 -y
@@ -68,27 +75,9 @@
 
             if ($env:BOND_BUILD -eq "Doc") {
 
-                cabal install --verbose=0 pandoc
+                cabal install -j pandoc --constraint='mtl<=2.1.3.1'
 
                 choco install doxygen.install -y
-
-            }
-
-            if ($env:BOND_BUILD -eq "C++") {
-
-                if (!(Test-Path boost.7z)) {
-
-                    echo "Downloading Boost 1.${env:BOND_BOOST} ..."
-
-                    Start-FileDownload "http://iweb.dl.sourceforge.net/project/boost/boost/1.${env:BOND_BOOST}.0/boost_1_${env:BOND_BOOST}_0.7z" -FileName boost.7z -Timeout 1200000
-
-                }
-
-                echo "Extracting Boost..."
-
-                7z x boost.7z -y -o"${env:APPVEYOR_BUILD_FOLDER}" "boost_1_${env:BOND_BOOST}_0/boost" > $null
-
-                $env:BOOST_ROOT = "${env:APPVEYOR_BUILD_FOLDER}/boost_1_${env:BOND_BOOST}_0"
 
             }
 
@@ -97,11 +86,21 @@
     cache:
         - cs\packages -> cs\test\core\packages.config
         - compiler\.cabal-sandbox -> compiler\bond.cabal
-        - boost.7z
-        - boost.exe
 
     before_build:
         - ps: >-
+            $env:PreferredToolArchitecture = "x64"
+
+            $env:_IsNativeEnvironment = "true"
+
+            $cmakeGenerator = $env:BOND_VS
+
+            if ($env:BOND_ARCH -eq 64) {
+                $cmakeGenerator += " Win64"
+            }
+
+            $cmakeFlags = $env:BOND_CMAKE_FLAGS -split ';'
+
             if ($env:BOND_BUILD -eq "C#" -Or $env:BOND_BUILD -eq "C++") {
 
                 nuget restore cs\cs.sln
@@ -116,7 +115,7 @@
 
                 Wait-Process -name boost
 
-                cmake "-DBoost_ADDITIONAL_VERSIONS=1.${env:BOND_BOOST}.0" -G $env:BOND_VS ..
+                cmake "-DBoost_ADDITIONAL_VERSIONS=1.${env:BOND_BOOST}.0" $cmakeFlags -G $cmakeGenerator ..
 
             }
 
@@ -128,7 +127,12 @@
 
                 cd build
 
-                cmake -G $env:BOND_VS ..
+                # Make sure we have Python27-64 before any other version; Python path per https://www.appveyor.com/docs/installed-software#python
+                if ($env:BOND_ARCH -eq 64) {
+                    $env:Path = "C:\Python27-x64\scripts;C:\Python27-x64\;${env:Path}"
+                }
+
+                cmake $cmakeFlags -G $cmakeGenerator ..
 
             }
 
@@ -142,10 +146,13 @@
 
             }
 
-            $env:PreferredToolArchitecture = "x64"
 
     build_script:
         - ps: >-
+            $env:PreferredToolArchitecture = "x64"
+
+            $env:_IsNativeEnvironment = "true"
+
             if ($env:BOND_BUILD -eq "Doc") {
 
                 cmake --build . --target documentation -- /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
@@ -195,6 +202,12 @@
 
             }
 
+            if ($env:BOND_BUILD -eq "C# .NET Core") {
+
+                & cs\dnc\build.ps1 -Configuration $env:BOND_CONFIG -Verbosity minimal -MSBuildLogger "C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+
+            }
+
             if (-not $?) { throw "build failed" }
 
     test_script:
@@ -202,16 +215,28 @@
             if ($env:BOND_BUILD -eq "Python") {
 
                 ctest -C Debug --tests-regex python_unit_test --output-on-failure
+                if (-not $?) { throw "tests failed" }
 
             }
 
             if ($env:BOND_BUILD -eq "C#") {
 
                 nunit-console-x86 /framework:net-4.0 /labels "cs\test\core\bin\debug\net40\${env:BOND_OUTPUT}\Bond.UnitTest.dll" cs\test\internal\bin\debug\net40\Bond.InternalTest.dll
-
-                if (-not $?) { throw "build failed" }
+                if (-not $?) { throw "tests failed" }
 
                 nunit-console-x86 /framework:net-4.5 /labels "cs\test\core\bin\debug\net45\${env:BOND_OUTPUT}\Bond.UnitTest.dll" cs\test\internal\bin\debug\net45\Bond.InternalTest.dll
+                if (-not $?) { throw "tests failed" }
+
+                # We need to investigate why these tests are failing in AppVeyor, but not locally.
+                # nunit-console-x86 /framework:net-4.5 /labels "cs\test\comm\bin\debug\net45\${env:BOND_OUTPUT}\Bond.Comm.UnitTest.dll"
+                # if (-not $?) { throw "tests failed" }
+
+            }
+
+            if ($env:BOND_BUILD -eq "C# .NET Core") {
+
+                & cs\dnc\build.ps1 -Test -Configuration $env:BOND_CONFIG -Verbosity minimal -MSBuildLogger "C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+                if (-not $?) { throw "tests failed" }
 
             }
 

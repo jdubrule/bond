@@ -6,6 +6,7 @@
     using Bond;
     using NUnit.Framework;
     using Bond.Tag;
+    using Bond.Reflection;
 
     [TestFixture]
     public class ReflectionTests
@@ -51,6 +52,56 @@
             Assert.That(() => Reflection.FindMethod(typeof(IReaderAB), "ReadStructBegin", new Type[0]),
                 Throws.TypeOf<System.Reflection.AmbiguousMatchException>()
                      .With.Message.Contains("FindMethod found more than one matching method"));
+        }
+
+        // We test on the SchemaFields instead of the RuntimeSchema, because, for now, the list sub
+        // type is not part of Bond.TypeDef
+        [Test]
+        public void DifferentiateBetweenListAndNullable()
+        {
+            var schemaFields = typeof(ListVsNullable).GetSchemaFields();
+
+            foreach (var field in schemaFields)
+            {
+                ListSubType fieldListSubType = field.GetSchemaType().GetBondListDataType();
+
+                switch (field.Name)
+                {
+                    case "nullableInt":
+                        Assert.AreEqual(ListSubType.NULLABLE_SUBTYPE, fieldListSubType);
+                        break;
+
+                    case "vectorInt":
+                        Assert.AreEqual(ListSubType.NO_SUBTYPE, fieldListSubType);
+                        break;
+
+                    case "listInt":
+                        Assert.AreEqual(ListSubType.NO_SUBTYPE, fieldListSubType);
+                        break;
+
+                    case "blobData":
+                        Assert.AreEqual(ListSubType.BLOB_SUBTYPE, fieldListSubType);
+                        break;
+
+                    default:
+                        Assert.Fail("Unexpected field '{0}'", field.Name);
+                        break;
+                }
+            }
+        }
+
+        // We test on the SchemaFields instead of the RuntimeSchema, because, for now, the list sub
+        // type is not part of Bond.TypeDef
+        [Test]
+        public void EnsureUnknownSeqIDLType()
+        {
+            var schemaFields = typeof(BasicTypes).GetSchemaFields();
+
+            foreach (var field in schemaFields)
+            {
+                ListSubType fieldListSubType = field.GetSchemaType().GetBondListDataType();
+                Assert.AreEqual(ListSubType.NO_SUBTYPE, fieldListSubType, "Failed on field '{0}'", field.Name);
+            }
         }
 
         static Type GetFieldSchemaTypeClass<T>(string name)

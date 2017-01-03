@@ -1,19 +1,22 @@
 -- Copyright (c) Microsoft. All rights reserved.
 -- Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-{-# LANGUAGE OverloadedStrings, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, TemplateHaskell, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Tests.Syntax
     ( roundtripAST
     , compareAST
+    , failBadSyntax
     , aliasResolution
     , verifySchemaDef
     ) where
 
+import Control.Exception
 import Data.Maybe
 import Data.List
 import Data.Aeson (encode, decode)
+import Data.Aeson.Encode.Pretty (Config(..), encodePretty')
 import Data.DeriveTH
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -40,9 +43,20 @@ derive makeArbitrary ''Modifier
 derive makeArbitrary ''Namespace
 derive makeArbitrary ''Type
 derive makeArbitrary ''TypeParam
+derive makeArbitrary ''Method
 
 roundtripAST :: Bond -> Bool
 roundtripAST x = (decode . encode) x == Just x
+
+assertException :: String -> IO a -> Assertion
+assertException errMsg action = do
+    e <- try action
+    case e of
+        Left (_ :: SomeException) -> return ()
+        Right _ -> assertFailure errMsg
+
+failBadSyntax :: String -> FilePath -> Assertion
+failBadSyntax errMsg file = assertException errMsg (parseBondFile [] $ "tests" </> "schema" </> "error" </> file <.> "bond")
 
 compareAST :: FilePath -> Assertion
 compareAST file = do
@@ -106,8 +120,11 @@ verifySchemaDef baseName schemaName =
             BL.fromStrict $
             replace "\\u003c" "<" $
             replace "\\u003e" ">" $
-            BL.toStrict $ encodeSchemaDef $ BT_UserDefined schema []
+            BL.toStrict $ prettyEncode $ makeSchemaDef $ BT_UserDefined schema []
       where
+        prettyEncode = encodePretty' (Config indentSpaces compare)
+          where
+            indentSpaces = 2
         replace s r bs = if B.null t then h else
             B.append h (B.append r $ replace s r (B.drop (B.length s) t))
           where

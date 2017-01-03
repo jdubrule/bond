@@ -14,7 +14,8 @@ Portability : portable
 
 module Language.Bond.Syntax.SchemaDef
     ( -- * Runtime schema (aka SchemaDef) support
-       encodeSchemaDef
+       encodeSchemaDef,
+       makeSchemaDef
     ) where
 
 import Data.Word
@@ -62,11 +63,17 @@ data FieldDef =
 
 data TypeDef =
     TypeDef
+          -- Domain of Int is BondDataType
         { id :: Maybe Int
+          -- Index of struct definition in SchemaDef.structs when id == BT_STRUCT
         , struct_def :: Maybe Int
         , element :: Maybe [TypeDef]
         , key :: Maybe [TypeDef]
         , bonded_type :: Maybe Bool
+          -- Domain of Int is ListSubType.
+          -- Currently not present in TypeDef, as its addition is breaking
+          -- some users that have already serialized SchemaDef structs.
+          --, list_sub_type :: Maybe Int
         }
 
 data Metadata =

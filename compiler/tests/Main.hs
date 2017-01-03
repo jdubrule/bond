@@ -10,11 +10,12 @@ import Tests.Codegen
 tests :: TestTree
 tests = testGroup "Compiler tests"
     [ testGroup "AST"
-        [ localOption (QuickCheckMaxSize 15) $
+        [ localOption (QuickCheckMaxSize 6) $
             testProperty "roundtrip" roundtripAST
         , testGroup "Compare .bond and .json"
             [ testCase "attributes" $ compareAST "attributes"
             , testCase "basic types" $ compareAST "basic_types"
+            , testCase "bond_meta types" $ compareAST "bond_meta"
             , testCase "complex types" $ compareAST "complex_types"
             , testCase "default values" $ compareAST "defaults"
             , testCase "empty" $ compareAST "empty"
@@ -22,6 +23,10 @@ tests = testGroup "Compiler tests"
             , testCase "generics" $ compareAST "generics"
             , testCase "inheritance" $ compareAST "inheritance"
             , testCase "type aliases" $ compareAST "aliases"
+            , testCase "documentation example" $ compareAST "example"
+            , testCase "simple service syntax" $ compareAST "service"
+            , testCase "service attributes" $ compareAST "service_attributes"
+            , testCase "generic service" $ compareAST "generic_service"
             , testCase "documentation example" $ compareAST "example"
             ]
         ]
@@ -42,10 +47,17 @@ tests = testGroup "Compiler tests"
     , testGroup "Types"
         [ testCase "type alias resolution" aliasResolution
         ]
+    , testGroup "Codegen Failures (Expect to see errors below check for OK or FAIL)"
+        [ testCase "Struct default value nothing" $ failBadSyntax "Should fail when default value of a struct field is 'nothing'" "struct_nothing"
+        , testCase "Enum no default value" $ failBadSyntax "Should fail when an enum field has no default value" "enum_no_default"
+        , testCase "Alias default value" $ failBadSyntax "Should fail when underlying default value is of the wrong type" "aliases_default"
+        , testCase "Out of range" $ failBadSyntax "Should fail, out of range for int16" "int_out_of_range"
+        ]
     , testGroup "Codegen"
         [ testGroup "C++"
             [ verifyCppCodegen "attributes"
             , verifyCppCodegen "basic_types"
+            , verifyCppCodegen "bond_meta"
             , verifyCppCodegen "complex_types"
             , verifyCppCodegen "defaults"
             , verifyCppCodegen "empty"
@@ -86,9 +98,24 @@ tests = testGroup "Compiler tests"
                 ]
                 "basic_types"
             ]
+            , testGroup "Comm"
+                [ verifyCppCommCodegen
+                    [ "c++"
+                    ]
+                    "service"
+                , verifyCppCommCodegen
+                    [ "c++"
+                    ]
+                    "generic_service"
+                , verifyCppCommCodegen
+                    [ "c++"
+                    ]
+                    "service_attributes"
+                ]
     , testGroup "C#"
             [ verifyCsCodegen "attributes"
             , verifyCsCodegen "basic_types"
+            , verifyCsCodegen "bond_meta"
             , verifyCsCodegen "complex_types"
             , verifyCsCodegen "defaults"
             , verifyCsCodegen "empty"
@@ -101,6 +128,16 @@ tests = testGroup "Compiler tests"
                 , "--using=time=System.DateTime"
                 ]
                 "nullable_alias"
+            , testGroup "Comm"
+                [ verifyCsCommCodegen
+                    [ "c#"
+                    ]
+                    "service"
+                , verifyCsCommCodegen
+                    [ "c#"
+                    ]
+                    "generic_service"
+                ]
             ]
         ]
     ]

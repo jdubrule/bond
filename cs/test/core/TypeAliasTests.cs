@@ -1,10 +1,11 @@
 ﻿namespace UnitTest.Aliases
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
+    using System.Linq;
     using Bond;
     using NUnit.Framework;
-    using System.Linq;
 
     public class Lazy<T> : IBonded<T>
     {
@@ -69,7 +70,7 @@
 
         public override bool Equals(object obj)
         {
-            return Comparer.Equal(Value, (obj as Lazy<T>).Value);
+            return Bond.Comparer.Equal(Value, (obj as Lazy<T>).Value);
         }
 
         public override int GetHashCode()
@@ -149,7 +150,7 @@
 
             var seed = (int)DateTime.Now.ToBinary();
             var r = new System.Random(seed);
-            System.Diagnostics.Trace.TraceInformation("Random seed {0}", seed);
+            System.Diagnostics.Debug.WriteLine("Random seed {0}", seed);
 
             var target = new bool[66];
             foreach (var i in Enumerable.Range(0, 66))
@@ -231,6 +232,34 @@
             TestTypeAliases(from);
         }
 
+        // We test on the SchemaFields instead of the RuntimeSchema, because, for now, the list sub
+        // type is not part of Bond.TypeDef
+        [Test]
+        public void AliasesListDataType()
+        {
+            var schemaFields = typeof(ContainerAlias).GetSchemaFields();
+
+            foreach (var field in schemaFields)
+            {
+                ListSubType fieldListSubType = field.GetSchemaType().GetBondListDataType();
+
+                switch (field.Name)
+                {
+                    case "customListFoo":
+                        Assert.AreEqual(ListSubType.NULLABLE_SUBTYPE, fieldListSubType);
+                        break;
+
+                    case "arrayBlob":
+                        Assert.AreEqual(ListSubType.BLOB_SUBTYPE, fieldListSubType);
+                        break;
+
+                    default:
+                        Assert.AreEqual(ListSubType.NO_SUBTYPE, fieldListSubType, "Failed on field '{0}'", field.Name);
+                        break;
+                }
+            }
+        }
+
         static BlobAlias InitBlobAlias()
         {
             return new BlobAlias
@@ -252,6 +281,72 @@
 
             var to = Clone<T>.From(Clone<U>.From(from));
             Assert.IsTrue(from.IsEqual<T>(to));
+        }
+    }
+
+    // An extremely simple example of a custom container implementation.
+    public class SomeCustomList<T> : ICollection<T>, ICollection
+    {
+        readonly List<T> backingList = new List<T>();
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            return backingList.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return ((IEnumerable)backingList).GetEnumerator();
+        }
+
+        public void Add(T item)
+        {
+            backingList.Add(item);
+        }
+
+        public void Clear()
+        {
+            backingList.Clear();
+        }
+
+        public bool Contains(T item)
+        {
+            return backingList.Contains(item);
+        }
+
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            backingList.CopyTo(array, arrayIndex);
+        }
+
+        public bool Remove(T item)
+        {
+            return backingList.Remove(item);
+        }
+
+        public void CopyTo(Array array, int index)
+        {
+            ((ICollection)backingList).CopyTo(array, index);
+        }
+
+        public int Count
+        {
+            get { return backingList.Count; }
+        }
+
+        public object SyncRoot
+        {
+            get { return ((ICollection)backingList).SyncRoot; }
+        }
+
+        public bool IsSynchronized
+        {
+            get { return ((ICollection)backingList).IsSynchronized; }
+        }
+
+        bool ICollection<T>.IsReadOnly
+        {
+            get { return ((ICollection<T>)backingList).IsReadOnly; }
         }
     }
 }

@@ -11,14 +11,15 @@
     using Bond.Expressions;
     using Bond.Protocols;
     using Bond.IO.Unsafe;
+    using Bond.Reflection;
 
     internal static class DebugViewHelper
     {
         static readonly PropertyInfo debugView;
 
-        static DebugViewHelper() 
+        static DebugViewHelper()
         {
-            debugView = typeof(Expression).GetProperty("DebugView", BindingFlags.NonPublic | BindingFlags.Instance);
+            debugView = typeof(Expression).GetDeclaredProperty("DebugView", typeof(string));
         }
 
         public static string ToString(Expression expression)
@@ -111,9 +112,12 @@
     {
         static void Write(string name, IDebugView codegen)
         {
-            using (var file = new StreamWriter(name, false))
+            using (var file = File.Create(name))
             {
-                file.Write(codegen.DebugView);
+                using (var sw = new StreamWriter(file))
+                {
+                    sw.Write(codegen.DebugView);
+                }
             }
         }
 

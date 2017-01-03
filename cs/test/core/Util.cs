@@ -17,7 +17,7 @@ namespace UnitTest
 
     public static class Util
     {
-        private const int UnsafeBufferSize = 192 * 1024;
+        private const int UnsafeBufferSize = 4 * 1024 * 1024;
 
         public static IEnumerable<MethodInfo> GetDeclaredMethods(this Type type, string name)
         {
@@ -996,7 +996,7 @@ namespace UnitTest
                 streamTranscode(SerializeSP, TranscodeSPFB<From>, DeserializeFB<To>);
 
                 // Pull parser doesn't support bonded<T>
-                if (AnyField<From>(Reflection.IsBonded))
+                if (AnyField<From>(BondReflection.IsBonded))
                 {
                     streamTranscode(SerializeSP, TranscodeSPXml<From>, DeserializeXml<To>);
                 
@@ -1018,7 +1018,7 @@ namespace UnitTest
             }
 
             // Pull parser doesn't supprot bonded<T>
-            if (AnyField<From>(Reflection.IsBonded))
+            if (AnyField<From>(BondReflection.IsBonded))
             {
                 streamRoundtrip(SerializeXml, DeserializeXml<To>);
                 streamTranscode(SerializeCB, TranscodeCBXml<From>, DeserializeXml<To>);
