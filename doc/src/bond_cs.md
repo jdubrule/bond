@@ -1,4 +1,4 @@
-% A Young Person's Guide to C# Bond
+﻿% A Young Person's Guide to C# Bond
 
 About
 =====
@@ -15,6 +15,11 @@ serialization protocols, data streams, user defined type aliases and more.
 
 By design Bond is language and platform independent and is currently supported
 for C++, C#, and Python on Linux, OS X and Windows.
+
+We are also introducing the
+[Bond Communications framework](https://Microsoft.github.io/bond/manual/bond_comm.html)--known
+as Bond Comm. More information about Bond Comm for C# can be found
+[below](#bond-comm).
 
 Bond is published on GitHub at [https://github.com/Microsoft/bond/](https://github.com/Microsoft/bond/).
 
@@ -102,6 +107,15 @@ of `nothing`](bond_cpp.html#default-value-of-nothing), e.g.:
     {
         0: string str = nothing;
     }
+
+Caveat: `blob`, `nullable<blob>` and `blob = nothing` are all represented as
+an `ArraySegment<byte>` in the generated C# code. The default value for all
+three is `default(ArraySegment<byte>)` (in which the `Array` field is
+`null`). An empty `ArraySegment<byte>` (in which the `Array` field is not
+`null` but the `Count` is 0) is treated as a non-default value, so it will
+not be omitted for optional fields. This behavior will be changing in a
+future release, to align it with how other types are handled and how
+nullable/nothing fields are handled in other languages.
 
 Code generation can be customized by passing one or more of the following
 command line options to `gbc`:
@@ -1128,6 +1142,167 @@ public constructors:
         }
     }
 
+NuGet packages
+==============
+
+Pre-compiled versions of Bond are distributed via NuGet packages from NuGet.org.
+
+[![Bond.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.CSharp/)
+**Bond.CSharp** - An omnibus package that pulls in everything required to
+use Bond in a C# project. If you're not sure which packages to use, use this
+one. (It will pull in all the other packages you need.)
+
+[![Bond.Core.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.Core.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.Core.CSharp/)
+**Bond.Core.CSharp** - The assemblies required to use Bond at runtime.
+Useful if some other assembly already contains the compiled types. If your
+project contains .bond files, you will need to use either Bond.CSharp or
+Bond.Compiler.CSharp to perform code generation at build time.
+
+[![Bond.Runtime.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.Runtime.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.Runtime.CSharp/)
+**Bond.Runtime.CSharp** - Additional assemblies that may be needed at
+runtime depending on which Bond [protocols](bond_cpp.html#protocols) are
+being used. Needed for Simple JSON.
+
+[![Bond.Compiler.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.Compiler.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.Compiler.CSharp/)
+**Bond.Compiler.CSharp** - A package with the
+[Bond compiler (gbc)](compiler.html) and MSBuild targets for C# code
+generation. Bond.CSharp includes similar functionality, but pulls in lots of
+dependencies. Bond.Complier.CSharp has no dependencies.
+
+[![Bond.Compiler NuGet package](https://img.shields.io/nuget/v/Bond.Compiler.svg?style=flat)](https://www.nuget.org/packages/Bond.Compiler/)
+**Bond.Compiler** - A tools-only package that contains the
+[Bond compiler (gbc)](compiler.html). This is useful if you want to
+integrate gbc into a build process that isn't using C# or MSBuild.
+
+For example, if you want to use Bond's Compact Binary protocol but want to
+avoid a dependency on Newtonsoft's JSON.NET, you can use the
+Bond.Compiler.CSharp and Bond.Core.CSharp packages together.
+
+## Platform limitations ##
+
+The pre-compiled gbc that is included in these packages is Windows-only. See
+the [README](https://github.com/Microsoft/bond/blob/master/README.md) for
+instructions to build gbc for other platforms.
+
+Bond.IO.dll (which provides the types in the Bond.IO.Unsafe namespace) is
+currently Windows-only, as it relies on some Win32 APIs. To stay
+cross-platform, only use the types from Bond.dll (in the Bond.IO.Safe
+namespace).
+
+## Frameworks targeted ##
+
+This table lists which frameworks are targeted by the Bond assemblies.
+
+This table is accurate for Bond NuGet packages 5.1.0 and later and Bond Comm
+0.9.0 and later.
+
+| Assembly                 | .NET 4.0 | .NET 4.5 | Profile78 | .NET Standard 1.0 | .NET Standard 1.3 | .NET Standard 1.6 |
+|--------------------------|----------|----------|-----------|-------------------|-------------------|-------------------|
+| Bond.Attributes.dll      | Yes      | Yes      | Yes       | Yes               | ←                 | Yes               |
+| Bond.Reflection.dll      | Yes      | Yes      | Yes       | Yes               | ←                 | Yes               |
+| Bond.dll                 | Yes      | Yes      | Yes       | Yes               | ←                 | Yes               |
+| Bond.JSON.dll            | Yes      | Yes      | No        | Yes               | ←                 | Yes               |
+| Bond.IO.dll              | Win only | Win only | No        | No                | Win only          | Win only          |
+| Bond.Comm.Interfaces.dll | No       | Yes      | Yes       | ←                 | ←                 | ←                 |
+| Bond.Comm.Layers.dll     | No       | Yes      | Yes       | ←                 | ←                 | ←                 |
+| Bond.Comm.Services.dll   | No       | Yes      | Yes       | ←                 | ←                 | ←                 |
+| Bond.Comm.Epoxy.dll      | No       | Yes      | No        | No                | No                | No                |
+
+A left arrow (←) indicates that support for that framework is provided by
+the version of the assembly that targets a lower version of the framework.
+
+Bond Comm
+=========
+
+The [Bond Communications framework](bond_comm.html) in C# makes it easy and
+efficent to construct services and hook clients up to those services. Built
+on top of the Bond serialization framework, Bond Comm aims for the same
+principles of high-performance and extensibility.
+
+Today the framework supports two messaging patterns:
+
+- request-response: roundtrip messages supporting either payload or error responses
+- event: one-way, fire-and-forget messages with no responses
+
+Bond Comm is naturally asynchronous, and the C# implementation takes advantage of the
+idiomatic Task and async/await facilities of .NET.
+
+Bond Comm is designed to run on NET&nbsp;4.5 or .NET&nbsp;Core. Mono
+support is forthcoming, as are Linux and Mac&nbsp;OS&nbsp;X -- only Windows 10 and Windows
+Server 2012 R2 have been tested to date.
+
+See the following examples:
+
+- the [C# calculator sample project](https://github.com/Microsoft/bond-comm-cs-example)
+- `examples/cs/comm/pingpong`
+- `examples/cs/comm/notifyevent`
+
+### Defining services ###
+
+Cross-language services are defined in the [Bond IDL](bond_comm.html#defining-services).
+
+The generated C# service stub contains a service base class that the developer should subclass to
+provide the business logic of their service.
+
+The generated proxy stub provides a class with methods that the developer can call to
+exhange messages with the service.
+
+### Epoxy Transport ###
+
+Bond Comm provides a binary transport called
+[Epoxy](bond_comm_epoxy.html). This is the recommended default Transport.
+The Epoxy transport is designed to be .NET&nbsp;Core compliant, which will
+allow for cross-platform support.
+
+Epoxy supports TLS as of version 0.6.0.
+
+### SimpleInMem Transport ###
+
+Bond Comm provides an in-memory, single process, binary transport called
+[SimpleInMem](bond_comm_simpleinmem.html). This is not a shared memory transport.
+
+This is an example Transport recommended only for test automation.
+
+### Logging and Metrics Facades ###
+
+Bond Comm includes facades for logging and metrics. By writing simple handlers
+for logging and metrics, developers can supply their own logging and metrics
+facilities to gather log and metric data from Bond Comm-based services.
+
+See the following examples:
+
+- `examples/cs/comm/logging`
+- `examples/cs/comm/metrics`
+
+### Roadmap ###
+
+We have a [brief roadmap](bond_comm_roadmap.html) for Bond Comm.
+
+### Comm NuGet Packages ###
+
+Bond Comm is split into a number of NuGet packages to allow for granular
+consumption. Some of these packages will have dependencies on core Bond
+packages as well.
+
+[![Bond.Comm.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.Comm.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.Comm.CSharp/)
+**Bond.Comm.CSharp** - An omnibus package that contains everything needed to
+use Bond Comm. If you're not sure which packages to use, use this one. (It
+will pull in the rest of them.)
+
+[![Bond.Comm.Runtime.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.Comm.Runtime.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.Comm.Runtime.CSharp/)
+**Bond.Comm.Runtime.CSharp** The assemblies required to use Bond at runtime.
+Useful if some other assembly already contains the compiled types. If your
+project contains .bond files, you will need to use either Bond.Comm.CSharp
+or Bond.Compiler.CSharp to perform code generation at build time.
+
+[![Bond.Comm.Epoxy.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.Comm.Epoxy.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.Comm.Epoxy.CSharp/)
+**Bond.Comm.Epoxy.CSharp** The [Epoxy](bond_comm_epoxy.html) transport.
+You'll need at least one transport, and Epoxy is a good default choice.
+
+[![Bond.Comm.SimpleInMem.CSharp NuGet package](https://img.shields.io/nuget/v/Bond.Comm.SimpleInMem.CSharp.svg?style=flat)](https://www.nuget.org/packages/Bond.Comm.SimpleInMem.CSharp/)
+**Bond.Comm.SimpleInMem.CSharp** The [SimpleInMem](bond_comm_simpleinmem.html) transport.
+SimpleInMem is a good transport for unit tests, as it is lightweight and doesn't require or support cross-process communication.
+
 References
 ==========
 
@@ -1140,8 +1315,10 @@ References
 [Python User's Manual][bond_py]
 ----------------------------
 
-[compiler]: compiler.html
+[Bond Comm overview][bond_comm]
+----------------------------
 
-[bond_py]: bond_py.html
-
+[bond_comm]: bond_comm.html
 [bond_cpp]: bond_cpp.html
+[bond_py]: bond_py.html
+[compiler]: compiler.html

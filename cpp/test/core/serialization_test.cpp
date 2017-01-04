@@ -310,3 +310,11 @@ void SerializationTest::SimpleStructTestsInit()
             UntaggedProtocolReader<bond::InputBuffer>,
             UntaggedProtocolWriter<bond::OutputBuffer> >("Omitting defaults for untagged protocol");
 }
+
+
+bool init_unit_test()
+{
+    SerializationTest::Initialize();
+    return true;
+}
+

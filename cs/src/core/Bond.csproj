@@ -1,7 +1,7 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath32)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath32)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <Import Project="$(MSBuildThisFileDirectory)\..\..\build\Portable.Internal.props" />
+  <Import Project="$(MSBuildThisFileDirectory)\..\..\build\internal\Portable.Internal.props" />
   <PropertyGroup>
     <ProjectGuid>{43CBBA9B-C4BC-4E64-8733-7B72562D2E91}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -72,9 +72,7 @@
     <Compile Include="protocols\SimpleXmlReader.cs" />
     <Compile Include="protocols\SimpleXmlWriter.cs" />
     <Compile Include="protocols\XmlMetadata.cs" />
-    <Compile Include="Reflection.cs" />
-    <Compile Include="Reflection40.cs" Condition="'$(TargetFrameworkVersion)' == 'v4.0'" />
-    <Compile Include="Reflection45.cs" Condition="'$(TargetFrameworkVersion)' == 'v4.5'" />
+    <Compile Include="BondReflection.cs" />
     <Compile Include="RuntimeSchema.cs" />
     <Compile Include="Schema.cs" />
     <Compile Include="Serializer.cs" />
@@ -88,6 +86,9 @@
     <Reference Include="Bond.Attributes">
       <HintPath>..\attributes\$(OutputPath)\Bond.Attributes.dll</HintPath>
     </Reference>
+    <Reference Include="Bond.Reflection">
+      <HintPath>..\reflection\$(OutputPath)\Bond.Reflection.dll</HintPath>
+    </Reference>
   </ItemGroup>
-  <Import Project="$(MSBuildThisFileDirectory)\..\..\build\Common.Internal.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)\..\..\build\internal\Common.Internal.targets" />
 </Project>

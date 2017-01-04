@@ -66,7 +66,7 @@ inline Skip(Reader& input)
 }
 
 
-// Skip container for static parser    
+// Skip container for static parser
 template <typename T, typename Reader>
 typename boost::enable_if_c<is_container<T>::value &&
          uses_static_parser<Reader>::value>::type
@@ -91,7 +91,7 @@ inline Skip(Reader& input, const RuntimeSchema& schema)
         }
         case bond::BondDataType::BT_MAP:
         {
-            return SkipMap(key_schema(schema).GetTypeId(), 
+            return SkipMap(key_schema(schema).GetTypeId(),
                 value<void, Reader&>(input, element_schema(schema), false), input);
         }
         case bond::BondDataType::BT_STRUCT:
@@ -119,7 +119,7 @@ typename boost::enable_if_c<is_container<T>::value &&
          !uses_static_parser<Reader>::value>::type
 inline Skip(Reader& input)
 {
-    // Call protocol to skip containers; this allows protocols to implement 
+    // Call protocol to skip containers; this allows protocols to implement
     // more efficient skipping than element-by-element
     input.template Skip<T>();
 }
@@ -186,7 +186,8 @@ public:
     {}
 
 #ifndef BOND_NO_CXX11_RVALUE_REFERENCES
-    value_common(value_common&& rhs)
+    value_common(value_common&& rhs) BOND_NOEXCEPT_IF(
+        bond::is_nothrow_copy_constructible<Reader>::value)
         : _input(rhs._input),
           _skip(std::move(rhs._skip))
     {
@@ -220,7 +221,7 @@ public:
         Skip();
     }
 
-    
+
 protected:
     Reader          _input;
     mutable bool    _skip;
@@ -239,7 +240,8 @@ public:
     {}
 
 #ifndef BOND_NO_CXX11_RVALUE_REFERENCES
-    value(value&& rhs)
+    value(value&& rhs) BOND_NOEXCEPT_IF((
+        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
 #endif
@@ -264,8 +266,8 @@ public:
         _skip = false;
         _input.Read(var, size);
     }
-    
-    
+
+
     // deserialize the value and cast it to a variable of a matching non-string type
     template <typename X>
     typename boost::enable_if_c<is_matching_basic<T, X>::value && !is_string_type<T>::value>::type
@@ -282,7 +284,7 @@ public:
         detail::set(var, data);
     }
 
-    
+
     // deserialize the value to a variable of a matching string type
     template <typename X>
     typename boost::enable_if_c<is_matching_basic<T, X>::value && is_string_type<T>::value>::type
@@ -301,7 +303,7 @@ protected:
 };
 
 
-// Specialization of value for type alias 
+// Specialization of value for type alias
 template <typename T, typename Reader>
 class value<T, Reader, typename boost::enable_if<is_type_alias<T> >::type>
     : public value_common<T, Reader>
@@ -312,7 +314,8 @@ public:
     {}
 
 #ifndef BOND_NO_CXX11_RVALUE_REFERENCES
-    value(value&& rhs)
+    value(value&& rhs) BOND_NOEXCEPT_IF((
+        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
 #endif
@@ -347,7 +350,8 @@ public:
     {}
 
 #ifndef BOND_NO_CXX11_RVALUE_REFERENCES
-    value(value&& rhs)
+    value(value&& rhs) BOND_NOEXCEPT_IF((
+        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
 #endif
@@ -404,7 +408,8 @@ public:
     {}
 
 #ifndef BOND_NO_CXX11_RVALUE_REFERENCES
-    value(value&& rhs)
+    value(value&& rhs) BOND_NOEXCEPT_IF((
+        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
 #endif
@@ -413,7 +418,7 @@ public:
     value(const value& that) = default;
     value& operator=(const value& that) = default;
 #endif
-    
+
     // Deserialize container
     template <typename X>
     typename boost::enable_if_c<is_matching_container<T, X>::value>::type
@@ -462,7 +467,10 @@ public:
     }
 
 #ifndef BOND_NO_CXX11_RVALUE_REFERENCES
-    value(value&& rhs)
+    value(value&& rhs) BOND_NOEXCEPT_IF(
+        bond::is_nothrow_move_constructible<Reader>::value
+        && bond::is_nothrow_move_constructible<SchemaDef>::value
+        && bond::is_nothrow_move_constructible<RuntimeSchema>::value)
         : _input(rhs._input),
           _schemaDef(std::move(rhs._schemaDef)),
           _schema(std::move(rhs._schema)),
@@ -499,7 +507,7 @@ public:
         if (_schema.GetTypeId() == get_type_id<X>::value)
         {
             _skip = false;
-            DeserializeContainer(var, 
+            DeserializeContainer(var,
                 value<void, Reader>(_input, element_schema(_schema), false), _input);
         }
         else
@@ -508,7 +516,7 @@ public:
         }
     }
 
-    
+
     // Deserialize map
     template <typename X>
     typename boost::enable_if<is_map_container<X> >::type
@@ -562,12 +570,12 @@ public:
         {
             BOOST_ASSERT(_schema.GetTypeId() == bond::BondDataType::BT_LIST || _schema.GetTypeId() == bond::BondDataType::BT_SET);
 
-            DeserializeContainer(transform, 
+            DeserializeContainer(transform,
                 value<void, Reader>(_input, element_schema(_schema), false), _input);
         }
     }
 
-    
+
     // skip value of non-matching type
     template <typename X>
     typename boost::disable_if_c<is_container<X>::value || is_bond_type<X>::value>::type
@@ -577,12 +585,12 @@ public:
     }
 
 
-    BondDataType GetTypeId() const 
+    BondDataType GetTypeId() const
     {
         return _schema.GetTypeId();
     }
 
-    
+
     RuntimeSchema GetRuntimeSchema() const
     {
         return _schema;
@@ -625,7 +633,7 @@ inline DeserializeElement(X& var, const I& item, const T& element)
 
 
 template <typename X, typename I, typename T>
-typename boost::disable_if<require_modify_element<X> >::type 
+typename boost::disable_if<require_modify_element<X> >::type
 inline DeserializeElement(X&, I& item, const T& element)
 {
     element.Deserialize(item);
@@ -637,7 +645,7 @@ template <typename X, typename T>
 typename boost::enable_if_c<is_list_container<X>::value
                          && is_element_matching<T, X>::value>::type
 inline DeserializeElements(X& var, const T& element, uint32_t size)
-{    
+{
     resize_list(var, size);
 
     for (enumerator<X> items(var); items.more();)
@@ -648,7 +656,7 @@ inline DeserializeElements(X& var, const T& element, uint32_t size)
 template <typename X, typename Allocator, bool useValue, typename T>
 typename boost::enable_if<is_matching<T, X> >::type
 inline DeserializeElements(nullable<X, Allocator, useValue>& var, const T& element, uint32_t size)
-{    
+{
     resize_list(var, size);
 
     for (enumerator<nullable<X, Allocator, useValue> > items(var); items.more(); --size)
@@ -656,15 +664,15 @@ inline DeserializeElements(nullable<X, Allocator, useValue>& var, const T& eleme
 
     // Wire representation and interface for nullable is the same as for list.
     // However nullable can "contain" at most one element. If there are more
-    // elements in the payload we skip them. 
+    // elements in the payload we skip them.
     while (size--)
-        element.Skip();        
+        element.Skip();
 }
 
 
 template <typename Reader>
 inline void DeserializeElements(blob& var, const value<blob::value_type, Reader&>& element, uint32_t size)
-{    
+{
     element.Deserialize(var, size);
 }
 
@@ -673,7 +681,7 @@ template <typename X, typename T>
 typename boost::enable_if_c<is_set_container<X>::value
                          && is_element_matching<T, X>::value>::type
 inline DeserializeElements(X& var, const T& element, uint32_t size)
-{    
+{
     clear_set(var);
 
     typename element_type<X>::type e(make_element(var));
@@ -689,7 +697,7 @@ inline DeserializeElements(X& var, const T& element, uint32_t size)
 template <typename X, typename T>
 typename boost::disable_if<is_element_matching<T, X> >::type
 inline DeserializeElements(X&, const T& element, uint32_t size)
-{    
+{
     while (size--)
         element.Skip();
 }
@@ -713,7 +721,7 @@ inline void SkipContainer(const value<std::pair<T1, T2>, Reader&>&, Reader& inpu
 
 template <typename T, typename Reader>
 inline void SkipContainer(const T& element, Reader& input)
-{    
+{
     BOOST_STATIC_ASSERT(uses_static_parser<Reader>::value);
 
     uint32_t size;
@@ -769,7 +777,7 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
             break;
         }
     }
-               
+
     input.ReadContainerEnd();
 }
 
@@ -792,7 +800,7 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
         while (size--)
             input.Skip(type);
     }
-               
+
     input.ReadContainerEnd();
 }
 
@@ -831,7 +839,7 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
             break;
         }
     }
-               
+
     input.ReadContainerEnd();
 }
 
@@ -839,7 +847,7 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
 template <typename X, typename Key, typename T>
 typename boost::enable_if<is_map_key_matching<Key, X> >::type
 inline DeserializeMapElements(X& var, const Key& key, const T& element, uint32_t size)
-{    
+{
     BOOST_STATIC_ASSERT((is_map_element_matching<T, X>::value));
 
     clear_map(var);
@@ -851,9 +859,9 @@ inline DeserializeMapElements(X& var, const Key& key, const T& element, uint32_t
         key.Deserialize(k);
 
 #ifndef NDEBUG
-        // In debug build To<T> asserts that optional fields are set to default 
-        // values before deserialization; if invalid map payload contains duplicate 
-        // keys the second time we deserialize a value it will trigger the assert. 
+        // In debug build To<T> asserts that optional fields are set to default
+        // values before deserialization; if invalid map payload contains duplicate
+        // keys the second time we deserialize a value it will trigger the assert.
         element.Deserialize(mapped_at(var, k) = make_value(var));
 #else
         element.Deserialize(mapped_at(var, k));
@@ -863,9 +871,9 @@ inline DeserializeMapElements(X& var, const Key& key, const T& element, uint32_t
 
 
 template <typename X, typename Key, typename T>
-typename boost::disable_if<is_map_key_matching<Key, X> >::type  
+typename boost::disable_if<is_map_key_matching<Key, X> >::type
 inline DeserializeMapElements(X&, const Key& key, const T& element, uint32_t size)
-{    
+{
     while (size--)
     {
         key.Skip();
@@ -911,7 +919,7 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
     std::pair<BondDataType, BondDataType> type(keyType, GetTypeId(element));
     uint32_t                              size;
 
-    input.ReadContainerBegin(size, type); 
+    input.ReadContainerBegin(size, type);
 
     switch (type.second)
     {
@@ -936,7 +944,7 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
             break;
         }
     }
-               
+
     input.ReadContainerEnd();
 }
 
@@ -948,7 +956,7 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
     std::pair<BondDataType, BondDataType> type(keyType, GetTypeId(element));
     uint32_t                              size;
 
-    input.ReadContainerBegin(size, type); 
+    input.ReadContainerBegin(size, type);
 
     if (type.second == GetTypeId(element))
     {
@@ -962,7 +970,7 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
             input.Skip(type.second);
         }
     }
-               
+
     input.ReadContainerEnd();
 }
 
@@ -974,7 +982,7 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
     std::pair<BondDataType, BondDataType> type(keyType, GetTypeId(element));
     uint32_t                              size;
 
-    input.ReadContainerBegin(size, type); 
+    input.ReadContainerBegin(size, type);
 
     switch (type.second)
     {
@@ -1007,9 +1015,8 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
             break;
         }
     }
-               
+
     input.ReadContainerEnd();
 }
 
 } // namespace bond
-    

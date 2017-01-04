@@ -89,25 +89,36 @@ if (Haskell_PANDOC_EXECUTABLE AND Doxygen_EXECUTABLE)
         OPTIONS --self-contained --table-of-contents
         OUTPUT_DIR manual)
 
+    add_pandoc_markdown(src/bond_comm.md src/bond_comm_roadmap.md
+        OPTIONS --self-contained --table-of-contents
+        OUTPUT_DIR manual)
+
+    add_pandoc_markdown(src/bond_comm_epoxy.md src/bond_comm_epoxy_wire.md
+        OPTIONS --self-contained --table-of-contents
+        OUTPUT_DIR manual)
+
+    add_pandoc_markdown(src/bond_comm_simpleinmem.md
+        OPTIONS --self-contained --table-of-contents
+        OUTPUT_DIR manual)
+
     add_pandoc_markdown (src/bond_cs.md
         CODE "cs,numberLines"
-        OPTIONS --self-contained --table-of-contents
+        OPTIONS --table-of-contents
         OUTPUT_DIR manual)
 
     add_pandoc_markdown (src/reference_index.md
         CODE cpp
-        OPTIONS --self-contained
+        OPTIONS --self-contained "--title-prefix=Bond Reference Index"
         OUTPUT_NAME index
         OUTPUT_DIR reference)
 
     add_pandoc_markdown (../README.md
-        TEMPLATE index.html
         OUTPUT_NAME index
-        CODE python)
+        OPTIONS --table-of-contents "--title-prefix=Bond, Microsoft's cross-platform framework for working with schematized data")
 
     add_pandoc_markdown (src/why_bond.md
-        TEMPLATE index.html
-        CODE python)
+        CODE python
+        OPTIONS --self-contained --table-of-contents)
 
     set (doxygen_sources
         doxygen/bond.doxygen

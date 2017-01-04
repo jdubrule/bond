@@ -8,6 +8,7 @@
 #include <bond/stream/input_buffer.h>
 #include <bond/stream/output_buffer.h>
 #include <bond/core/traits.h>
+#include <bond/core/protocol.h>
 
 namespace bond
 {
@@ -16,6 +17,8 @@ class RuntimeSchema;
 
 template <typename Writer>
 class Serializer;
+
+struct ValueReader;
 
 namespace detail
 {

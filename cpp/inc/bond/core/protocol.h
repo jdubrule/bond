@@ -19,6 +19,7 @@
 #include <bond/protocol/compact_binary.h>
 #include <bond/protocol/fast_binary.h>
 #include <bond/protocol/simple_json_reader.h>
+#include <bond/protocol/simple_json_writer.h>
 
 namespace bond
 {

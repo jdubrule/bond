@@ -525,56 +525,6 @@ namespace boost
 }
 
 
-template <typename Reader, typename Writer, typename Payload, typename T>
-void Merging(Payload payload, const T& obj, uint16_t version = bond::v1, bool mergeByDeserialize = true)
-{
-    Reader merged = Merge<Reader, Writer>(payload, obj, version);
-
-    // Deserialize merged into T and compare against obj
-    {
-        T to;
-        
-        if (!has_optional_fields<T::Schema>::value)
-        {
-            to = InitRandom<T>();
-            Fixup(to);
-        }
-
-        Deserialize(merged, to);
-
-        UT_AssertIsTrue(Equal(obj, to));
-    }
-
-    // Deserialize merged into Payload and compare against combination of the 
-    // orginal payload and the obj.
-    {
-        Payload to;
-
-        if (!has_optional_fields<Payload::Schema>::value)
-        {
-            to = InitRandom<Payload>();
-            Fixup(to);
-        }
-        
-        Deserialize(merged, to);
-
-        if (mergeByDeserialize)
-        {
-            // Ignore assert on using non-clean object for deserialization 
-            g_merging = true;
-            Deserialize(Serialize<Reader, Writer>(obj, version), payload);
-            g_merging = false;
-
-            UT_AssertIsTrue(Equal(payload, to));
-        }
-        else
-        {
-            UT_AssertIsTrue(MergedEqual(payload, to, obj));
-        }
-    }
-}
-
-
 template <typename Reader, typename Writer, typename From, typename To, typename BondedType>
 void AllBinding()
 {
@@ -604,34 +554,6 @@ void AllMapping()
         Mapping<Reader, Writer, From, To, BondedType>(InitRandom<From>());
         Mapping<Reader, Writer, From, To, BondedType>(InitRandom<From>(), Reader::version);
     }
-}
-
-
-template <typename Reader, typename Writer, typename Payload, typename T>
-void MergingRandom()
-{
-    // random values
-    for (uint32_t i = 0; i < c_iterations; ++i)
-    {
-        Merging<Reader, Writer>(InitRandom<Payload>(), InitRandom<T>());
-        Merging<Reader, Writer>(InitRandom<Payload>(), InitRandom<T>(), Reader::version);
-    }
-}
-
-
-template <typename Reader, typename Writer, typename Payload, typename T>
-void AllMerging()
-{
-    // default value
-    Merging<Reader, Writer>(Payload(), T());
-    Merging<Reader, Writer>(Payload(), T(), Reader::version);
-    Merging<Reader, Writer>(InitRandom<Payload>(), T());
-    Merging<Reader, Writer>(InitRandom<Payload>(), T(), Reader::version);
-    Merging<Reader, Writer>(Payload(), InitRandom<T>());
-    Merging<Reader, Writer>(Payload(), InitRandom<T>(), Reader::version);
-    
-    // random values
-    MergingRandom<Reader, Writer, Payload, T>();
 }
 
 

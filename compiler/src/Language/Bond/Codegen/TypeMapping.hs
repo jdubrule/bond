@@ -17,7 +17,8 @@ type system of a target programming language.
 module Language.Bond.Codegen.TypeMapping
     ( -- * Mapping context
       MappingContext(..)
-    , TypeMapping
+    , TypeMapping(..)
+    , TypeNameBuilder
       -- * Type mappings
     , idlTypeMapping
     , cppTypeMapping
@@ -48,6 +49,11 @@ module Language.Bond.Codegen.TypeMapping
     , getNamespace
     , getDeclNamespace
     , customAliasMapping
+      -- * TypeMapping helper functions
+    , elementTypeName
+    , aliasTypeName
+    , declTypeName
+    , declQualifiedTypeName
     ) where
 
 import Data.List
@@ -74,7 +80,7 @@ data MappingContext = MappingContext
     , namespaces :: [Namespace]
     }
 
--- | An opaque type representing a type mapping.
+-- | A type representing a type mapping.
 data TypeMapping = TypeMapping
     { language :: Maybe Language
     , global :: Builder
@@ -237,6 +243,8 @@ typeName t = do
 localWith :: (TypeMapping -> TypeMapping) -> TypeNameBuilder -> TypeNameBuilder
 localWith f = local $ \c -> c { typeMapping = f $ typeMapping c }
 
+-- | Builder for nested element types (e.g. list elements) in context of 'TypeNameBuilder' monad. 
+-- Used to implement 'mapType' function of 'TypeMapping'.
 elementTypeName :: Type -> TypeNameBuilder
 elementTypeName = localWith elementMapping . typeName
 
@@ -260,11 +268,15 @@ resolveNamespace MappingContext {..} ns =
 declQualifiedName :: MappingContext -> Declaration -> QualifiedName
 declQualifiedName c decl = getDeclNamespace c decl ++ [declName decl]
 
+-- | Builder for the qualified name for a 'Declaration' in context of 'TypeNameBuilder' monad.
+-- Used to implement 'mapType' function of 'TypeMapping'.
 declQualifiedTypeName :: Declaration -> TypeNameBuilder
 declQualifiedTypeName decl = do
     ctx <- ask
     return $ getDeclTypeName ctx decl
 
+-- | Builder for the name for a 'Declaration' in context of 'TypeNameBuilder' monad.
+-- Used to implement 'mapType' function of 'TypeMapping'.
 declTypeName :: Declaration -> TypeNameBuilder
 declTypeName decl = do
     ctx <- ask
@@ -279,6 +291,8 @@ findAliasMapping ctx a = find isSameAlias $ aliasMapping ctx
     isSameNs = namespaces ctx == declNamespaces a
     isSameAlias m = aliasDeclName == aliasName m || isSameNs && [declName a] == aliasName m
 
+-- | Builder for the type alias name in context of 'TypeNameBuilder' monad.
+-- Used to implement 'mapType' function of 'TypeMapping'.
 aliasTypeName :: Declaration -> [Type] -> TypeNameBuilder
 aliasTypeName a args = do
     ctx <- ask
@@ -336,15 +350,15 @@ cppType BT_String = pure "std::string"
 cppType BT_WString = pure "std::wstring"
 cppType BT_MetaName = pure "std::string"
 cppType BT_MetaFullName = pure "std::string"
-cppType BT_Blob = pure "bond::blob"
+cppType BT_Blob = pure "::bond::blob"
 cppType (BT_IntTypeArg x) = pureText x
-cppType (BT_Maybe type_) = "bond::maybe<" <>> elementTypeName type_ <<> ">"
+cppType (BT_Maybe type_) = "::bond::maybe<" <>> elementTypeName type_ <<> ">"
 cppType (BT_List element) = "std::list<" <>> elementTypeName element <<> ">"
-cppType (BT_Nullable element) = "bond::nullable<" <>> elementTypeName element <<> ">"
+cppType (BT_Nullable element) = "::bond::nullable<" <>> elementTypeName element <<> ">"
 cppType (BT_Vector element) = "std::vector<" <>> elementTypeName element <<> ">"
 cppType (BT_Set element) = "std::set<" <>> elementTypeName element <<> ">"
 cppType (BT_Map key value) = "std::map<" <>> elementTypeName key <<>> ", " <>> elementTypeName value <<> ">"
-cppType (BT_Bonded type_) = "bond::bonded<" <>> elementTypeName type_ <<> ">"
+cppType (BT_Bonded type_) = "::bond::bonded<" <>> elementTypeName type_ <<> ">"
 cppType (BT_TypeParam param) = pureText $ paramName param
 cppType (BT_UserDefined a@Alias {..} args) = aliasTypeName a args
 cppType (BT_UserDefined decl args) = declQualifiedTypeName decl <<>> (angles <$> commaSepTypeNames args)
@@ -356,8 +370,8 @@ cppTypeCustomAlloc alloc BT_WString = pure $ "std::basic_string<wchar_t, std::ch
 cppTypeCustomAlloc alloc BT_MetaName = cppTypeCustomAlloc alloc BT_String
 cppTypeCustomAlloc alloc BT_MetaFullName = cppTypeCustomAlloc alloc BT_String
 cppTypeCustomAlloc alloc (BT_List element) = "std::list<" <>> elementTypeName element <<>> ", " <>> allocator alloc element <<> ">"
-cppTypeCustomAlloc alloc (BT_Nullable element) | isStruct element = "bond::nullable<" <>> elementTypeName element <<> ", " <> alloc <> ">"
-cppTypeCustomAlloc _lloc (BT_Nullable element) = "bond::nullable<" <>> elementTypeName element <<> ">"
+cppTypeCustomAlloc alloc (BT_Nullable element) | isStruct element = "::bond::nullable<" <>> elementTypeName element <<> ", " <> alloc <> ">"
+cppTypeCustomAlloc _lloc (BT_Nullable element) = "::bond::nullable<" <>> elementTypeName element <<> ">"
 cppTypeCustomAlloc alloc (BT_Vector element) = "std::vector<" <>> elementTypeName element <<>> ", " <>> allocator alloc element <<> ">"
 cppTypeCustomAlloc alloc (BT_Set element) = "std::set<" <>> elementTypeName element <<>> comparer element <<>> allocator alloc element <<> ">"
 cppTypeCustomAlloc alloc (BT_Map key value) = "std::map<" <>> elementTypeName key <<>> ", " <>> elementTypeName value <<>> comparer key <<>> pairAllocator alloc key value <<> ">"

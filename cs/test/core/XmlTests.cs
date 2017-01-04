@@ -16,8 +16,10 @@
             new XmlReaderSettings
             {
                 IgnoreProcessingInstructions = true,
+#if !NETCOREAPP1_0
                 ValidationType = ValidationType.None,
                 ValidationFlags = XmlSchemaValidationFlags.None,
+#endif
             };
 
         [Test]
@@ -178,7 +180,7 @@ World</_str>
 
             var target = ParseXml<BasicTypes>(xml);
 
-            Assert.AreEqual(string.Empty, target._str);
+            Assert.IsEmpty(target._str);
             Assert.IsTrue(target._bool);
             Assert.AreEqual(13.2, target._double);
         }

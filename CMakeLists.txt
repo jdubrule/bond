@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.1)
 project (bond)
 
 cmake_policy (SET CMP0022 NEW)
@@ -9,6 +9,7 @@ set (CMAKE_MODULE_PATH
 
 enable_testing()
 
+set (BOND_IDL ${CMAKE_CURRENT_SOURCE_DIR}/idl)
 set (BOND_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/inc)
 set (BOND_PYTHON_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/python/inc)
 set (BOND_GENERATED ${CMAKE_CURRENT_SOURCE_DIR}/cpp/generated)
@@ -22,13 +23,17 @@ include (PythonTest)
 
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -C ${CMAKE_CFG_INTDIR} --output-on-failure)
 
-add_subfolder (compiler "compiler")
+if (NOT BOND_GBC_PATH)
+    add_subfolder (compiler "compiler")
+    if (NOT BOND_SKIP_GBC_TESTS)
+        add_dependencies (check gbc-tests)
+    endif()
+endif()
+
 add_subdirectory (cpp)
 add_subfolder (doc "doc")
 add_python_subdirectory (python)
 add_subdirectory (examples)
-
-add_dependencies (check gbc-tests)
 
 install (DIRECTORY
     cpp/inc/bond
@@ -41,3 +46,9 @@ install (EXPORT bond
     DESTINATION lib/bond
     EXPORT_LINK_INTERFACE_LIBRARIES)
 
+# if BOND_GBC_PATH is set we must copy over that gbc to the install location
+if (BOND_GBC_PATH)
+    install (FILES
+        ${BOND_GBC_PATH}
+        DESTINATION bin)
+endif()

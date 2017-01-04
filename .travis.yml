@@ -1,12 +1,14 @@
-sudo: false
+dist: trusty
+# trusty requires virtualization, which is set by 'sudo: required'
+sudo: required
 language: csharp
 os:
     - linux
-    - osx
 cache:
     directories:
         - compiler/.cabal-sandbox
         - cs/packages
+        - /home/travis/.ccache
 env:
     - BOND_LANG=cpp-clang
     - BOND_LANG=cpp-gcc
@@ -18,16 +20,23 @@ env:
 addons:
   apt:
     sources:
-        - boost-latest
+        - sourceline: 'ppa:kzemek/boost'
         - ubuntu-toolchain-r-test
         - hvr-ghc
     packages:
         - g++-4.8
-        - libboost1.55-all-dev
+        - boost1.58
+        - libboost-chrono1.58
+        - libboost-date-time1.58
+        - libboost-thread1.58
+        - libboost-system1.58
+        - libboost-test1.58
+        - libboost-python1.58
         - cabal-install-1.22
         - ghc-7.8.4
         - ghc-7.6.3
         - ghc
+        - ccache
 matrix:
   exclude:
     # linux VM is too small to build C++ unit tests with g++
@@ -36,30 +45,20 @@ matrix:
     # linux C++ build/test already includes Python
     - os: linux
       env: BOND_LANG=py-clang
-    # don't test non-default versions of GHC on OSX
-    - os: osx
-      env: BOND_GHC_VERSION=-7.8.4
-    - os: osx
-      env: BOND_GHC_VERSION=-7.6.3
-    # on OS X g++ and clang++ are the same compiler
-    - os: osx
-      env: BOND_LANG=cpp-gcc
-    - os: osx
-      env: BOND_LANG=py-gcc
 
 before_install:
+    - if [ "$TRAVIS_OS_NAME" == "linux" ]; then echo "Hardware:"; grep model\ name /proc/cpuinfo | uniq -c; free -m; fi
     # select C++ compiler
-    - export CXX="clang++" CC="clang"
-    - if [[ $BOND_LANG == *gcc ]]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+    # ccache splits up your C{,XX}FLAGS and makes separate preprocessor and
+    # compiler calls. It includes a few flags that aren't used by one half of
+    # the process or the other. -Qunused-arguments prevents clang from failing
+    # the build because of this.
+    - export CXX="ccache clang++ -Qunused-arguments" CC="ccache clang -Qunused-arguments"
+    - if [[ $BOND_LANG == *gcc ]]; then export CXX="ccache g++-4.8" CC="ccache gcc-4.8"; fi
     # linux prereqisite packages
     - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget --no-check-certificate https://www.cmake.org/files/v3.2/cmake-3.2.3-Linux-x86_64.tar.gz; fi
     - if [ "$TRAVIS_OS_NAME" == "linux" ]; then tar -xzvf cmake-3.2.3-Linux-x86_64.tar.gz; fi
     - if [ "$TRAVIS_OS_NAME" == "linux" ]; then export PATH=$PWD/cmake-3.2.3-Linux-x86_64/bin:$PATH; fi
-    # OS X prerequisite packages
-    - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew update; fi
-    - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install ghc cabal-install; fi
-    - if [ "$TRAVIS_OS_NAME" == "osx" ] && [[ $BOND_LANG == py* ]]; then brew unlink boost; fi
-    - if [ "$TRAVIS_OS_NAME" == "osx" ] && [[ $BOND_LANG == py* ]]; then brew install boost boost-python; fi
     # nunit installation
     - if [ "$BOND_LANG" == "cs" ]; then travis_retry nuget install NUnit.Runners -version 2.6.4; fi
     - export PATH=/opt/cabal/1.22/bin:/opt/ghc/${BOND_GHC_VERSION#?}/bin:$PATH
@@ -77,7 +76,6 @@ script:
     - if [ "$BOND_LANG" == "cs" ]; then export BOND_COMPILER_PATH=$HOME/usr/local/bin; fi
     - if [[ $BOND_LANG == cpp* ]]; then make --jobs 2 check; fi
     - if [ "$TRAVIS_OS_NAME" == "linux" ]; then export BOND_PYTHON_TARGETS="python_unit_test python_extension" BOND_PYTHON_TESTS=python_unit_test; fi
-    - if [ "$TRAVIS_OS_NAME" == "osx" ]; then export BOND_PYTHON_TARGETS="python_compatibility_test python_unit_test python_extension compatibility_test" BOND_PYTHON_TESTS=".*python.*"; fi
     - if [[ $BOND_LANG == py* ]]; then make $BOND_PYTHON_TARGETS; fi
     - if [[ $BOND_LANG == py* ]]; then ctest --tests-regex $BOND_PYTHON_TESTS --output-on-failure; fi
     - if [ "$BOND_GHC_VERSION" != "" ]; then make gbc-tests; fi

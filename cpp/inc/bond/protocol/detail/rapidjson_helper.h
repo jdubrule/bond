@@ -103,6 +103,8 @@ public:
     {
     }
 
+    typedef char Ch;
+
     // not implemented for write-only stream
     char Peek() { BOOST_ASSERT(false); return 0; }
     size_t Tell() const { BOOST_ASSERT(false); return 0; }
@@ -113,6 +115,10 @@ public:
     void Put(char c)
     {
         output.Write(c);
+    }
+
+    void Flush()
+    {
     }
 
 private:

@@ -7,6 +7,7 @@
 #include "protocol.h"
 #include "runtime_schema.h"
 #include "exception.h"
+#include <type_traits>
 
 namespace bond
 {
@@ -206,7 +207,7 @@ struct DoProtocolApply<Buffer, ProtocolList<P...>>
 
         auto doThese =
         {
-            result.second == MARSHALED_PROTOCOL && ((result = applyFunc(std::common_type<P,P>())), false)...
+            result.second == MARSHALED_PROTOCOL && ((result = applyFunc(*static_cast<std::common_type<P,P>::type*>(nullptr))), false)...
         };
 
         if (result.second == MARSHALED_PROTOCOL)
@@ -221,11 +222,11 @@ struct DoProtocolApply<Buffer, ProtocolList<P...>>
     DoProtocolApply(uint16_t protocol, F applyFunc)
     {
         bool matched = false;
-        std::pair<ProtocolType, bool> result = std::make_pair(MARSHALED_PROTOCOL, false);
+        std::pair<ProtocolType, bool> result = std::make_pair(static_cast<ProtocolType>(MARSHALED_PROTOCOL), false);
 
         auto doThese =
         {
-            protocol == P::magic && (matched = true) && ((result = std::make_pair(P::magic, applyFunc(std::common_type<P,P>()))), false)...
+			protocol == P::magic && (matched = true) == true && (((result = std::make_pair(static_cast<ProtocolType>(P::magic), applyFunc(*static_cast<std::common_type<P,P>::type*>(nullptr))))), false)...
         };
 
         if (!matched)
@@ -331,7 +332,7 @@ inline bool ApplyMatchingProtocol(
 }
 
 
-template<typename T, typename Buffer>
+template<template <typename Writer> class Transform, typename T, typename Buffer>
 struct ApplyWriteLambda
 {
     ApplyWriteLambda(const T& val, Buffer & buf):
@@ -342,8 +343,8 @@ struct ApplyWriteLambda
     template<typename TReader>
     bool operator()(TReader &) const
     {
-        TReader::type::Writer writer(m_buffer);
-        return Apply(Transform<decltype(writer)>(writer), m_value);
+        TReader::Writer writer(m_buffer);
+        return Apply(Transform<TReader::Writer>(writer), m_value);
     }
 
 private:
@@ -364,7 +365,7 @@ inline bool ApplyMatchingProtocol(
         output,
         protocol);
 #else
-    return DoProtocolApply<Buffer>(protocol, ApplyWriteLambda(value, output));
+    return DoProtocolApply<Buffer>(protocol, ApplyWriteLambda<Transform, T, Buffer>(value, output));
 #endif
 }
 

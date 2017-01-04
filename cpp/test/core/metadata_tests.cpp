@@ -236,6 +236,50 @@ TEST_CASE_BEGIN(RuntimeMetadataTests)
 }
 TEST_CASE_END
 
+TEST_CASE_BEGIN(get_list_sub_type_id_ListAndNullable)
+{
+    {
+        // we test on the type's Schema instead of SchemaDef because--for
+        // now--the list sub type is not present in TypeDef.
+
+        UT_AssertAreEqual(
+            bond::ListSubType::NULLABLE_SUBTYPE,
+            bond::get_list_sub_type_id<ListVsNullable::Schema::var::nullableInt::field_type>::value);
+
+        UT_AssertAreEqual(
+            bond::ListSubType::NO_SUBTYPE,
+            bond::get_list_sub_type_id<ListVsNullable::Schema::var::vectorInt::field_type>::value);
+
+        UT_AssertAreEqual(
+            bond::ListSubType::NO_SUBTYPE,
+            bond::get_list_sub_type_id<ListVsNullable::Schema::var::listInt::field_type>::value);
+
+        UT_AssertAreEqual(
+            bond::ListSubType::BLOB_SUBTYPE,
+            bond::get_list_sub_type_id<ListVsNullable::Schema::var::blobData::field_type>::value);
+    }
+}
+TEST_CASE_END
+
+struct NoSubTypeAsserter
+{
+    template <typename Field>
+    void operator()(const Field&) const
+    {
+        UT_AssertAreEqual(bond::ListSubType::NO_SUBTYPE,
+                          bond::get_list_sub_type_id<typename Field::field_type>::value);
+    }
+};
+
+TEST_CASE_BEGIN(EnsureUnknownSeqIDLType)
+{
+    {
+        // we test on the type's Schema instead of SchemaDef because--for
+        // now--the list sub type is not present in TypeDef.
+        bond::for_each_field<StructWithDefaults::Schema>(NoSubTypeAsserter());
+    }
+}
+TEST_CASE_END
 
 void MetadataTest::Initialize()
 {
@@ -244,8 +288,22 @@ void MetadataTest::Initialize()
     AddTestCase<TEST_ID(0x2201), CompileTimeMetadataTests>
         (suite, "Compile-time metadata test");
 
+    AddTestCase<TEST_ID(0x2201), get_list_sub_type_id_ListAndNullable>
+        (suite, "Differentiate Between List And Nullable");
+
+    AddTestCase<TEST_ID(0x2201), EnsureUnknownSeqIDLType>
+        (suite, "Ensure Unknown SeqIDLType");
+
     TEST_SIMPLE_PROTOCOL(
         AddTestCase<TEST_ID(0x2201), RuntimeMetadataTests>
             (suite, "Runtime metadata test");
     );
 }
+
+
+bool init_unit_test()
+{
+    MetadataTest::Initialize();
+    return true;
+}
+

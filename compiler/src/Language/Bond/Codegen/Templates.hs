@@ -36,15 +36,21 @@ module Language.Bond.Codegen.Templates
       -- ** C++
       types_h
     , types_cpp
+    , types_comm_cpp
     , reflection_h
     , enum_h
     , apply_h
     , apply_cpp
     ,  Protocol(..)
+      -- ** C++ Comm
+    , comm_h
       -- ** C#
     , FieldMapping(..)
     , StructMapping(..)
     , types_cs
+    , comm_interface_cs
+    , comm_proxy_cs
+    , comm_service_cs
     )
     where
 
@@ -54,8 +60,11 @@ import Language.Bond.Codegen.Cpp.ApplyOverloads
 import Language.Bond.Codegen.Cpp.Enum_h
 import Language.Bond.Codegen.Cpp.Reflection_h
 import Language.Bond.Codegen.Cpp.Types_cpp
+import Language.Bond.Codegen.Cpp.Types_Comm_cpp
 import Language.Bond.Codegen.Cpp.Types_h
+import Language.Bond.Codegen.Cpp.Comm_h
 import Language.Bond.Codegen.Cs.Types_cs
+import Language.Bond.Codegen.Cs.Comm_cs
 -- redundant imports for haddock
 import Language.Bond.Codegen.TypeMapping
 import Language.Bond.Syntax.Types

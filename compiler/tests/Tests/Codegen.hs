@@ -7,8 +7,10 @@
 module Tests.Codegen
     ( verifyCodegen
     , verifyCppCodegen
+    , verifyCppCommCodegen
     , verifyApplyCodegen
     , verifyCsCodegen
+    , verifyCsCommCodegen
     ) where
 
 import System.FilePath
@@ -63,6 +65,30 @@ verifyApplyCodegen args baseName =
                    "BOND_SIMPLE_BINARY_PROTOCOL"
         ]
 
+verifyCppCommCodegen :: [String] -> FilePath -> TestTree
+verifyCppCommCodegen args baseName =
+    testGroup baseName $
+        map (verifyFile (processOptions args) baseName cppTypeMapping "")
+            [ comm_h
+            , types_cpp
+            , types_comm_cpp
+            ]
+
+verifyCsCommCodegen :: [String] -> FilePath -> TestTree
+verifyCsCommCodegen args baseName =
+    testGroup baseName $
+        map (verifyFile (processOptions args) baseName csTypeMapping "")
+            [ comm_interface_cs
+            , comm_proxy_cs
+            , comm_service_cs
+            , types_cs Class (fieldMapping (processOptions args))
+            ]
+  where
+    fieldMapping Cs {..} = if readonly_properties
+        then ReadOnlyProperties
+        else if fields
+             then PublicFields
+             else Properties
 
 verifyFiles :: Options -> FilePath -> [TestTree]
 verifyFiles options baseName =
@@ -81,6 +107,7 @@ verifyFiles options baseName =
     templates Cpp {..} =
         [ reflection_h
         , types_cpp
+        , types_comm_cpp
         , types_h header enum_header allocator
         ]
     templates Cs {..} =
@@ -118,4 +145,3 @@ verifyFile options baseName typeMapping subfolder template =
                             (text "test output")
                             (text . BS.unpack)
                             (getContextDiff 3 (BS.lines x) (BS.lines y))
-

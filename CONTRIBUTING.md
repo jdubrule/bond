@@ -28,10 +28,10 @@ potential pitfalls before too much time is spent.
   [README](https://github.com/Microsoft/bond/blob/master/README.md).
 * Make small and atomic commits that include tests.
 * Make sure that all the tests continue to pass.
-  * The CMake `check` target will run the C++ tests for you.
-  * The C# unit tests can be run from
-    [the command line](https://github.com/Microsoft/bond/blob/56b5914a5bb41178521e01f6ce078d429e3e6b71/appveyor.yml#L214)
-    or from within Visual Studio.
+    * The CMake `check` target will run the C++ tests for you.
+    * The C# unit tests can be run from
+      [the command line](https://github.com/Microsoft/bond/blob/56b5914a5bb41178521e01f6ce078d429e3e6b71/appveyor.yml#L214)
+      or from within Visual Studio.
 * Update the [changelog](https://github.com/Microsoft/bond/blob/master/CHANGELOG.md).
 
 ### Rebase commits
@@ -91,3 +91,12 @@ comment letting us know that there's new stuff to review.
 
 If the pull request review goes well, a project maintainer will merge your
 changes. Thank you for helping improve Bond!
+
+# Code of Conduct
+
+This project has adopted the
+[Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the
+[Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
+or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any
+additional questions or comments.
