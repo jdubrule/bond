@@ -39,6 +39,7 @@ public:
     SimpleJsonReader(const SimpleJsonReader& that, const Field& value)
         : _stream(that._stream),
           _document(that._document),
+		  _input(that._input),
           _value(&value)
     {}
 
