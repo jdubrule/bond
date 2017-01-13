@@ -87,7 +87,7 @@ public:
     }
 
 private:
-    Buffer* input;
+    typename std::remove_reference<Buffer>::type* input;
     uint8_t current;
     size_t count;
 };
