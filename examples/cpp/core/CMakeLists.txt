@@ -1,4 +1,4 @@
-use_cxx11 ()
+set (CMAKE_CXX_STANDARD 11)
 add_subdirectory (access_control)
 add_subdirectory (attributes)
 add_subdirectory (bf)

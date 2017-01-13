@@ -1,4 +1,4 @@
-use_cxx11 ()
+set (CMAKE_CXX_STANDARD 11)
 
 set (core_schemas
     ${BOND_IDL}/bond/core/bond.bond
