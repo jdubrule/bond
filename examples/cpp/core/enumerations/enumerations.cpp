@@ -72,7 +72,7 @@ void ConversionToFromEnum()
     Color value;
     result = ToEnum(value, "Yellow");
     assert(result);
-    assert(value == Yellow);
+    assert(value == Color::Yellow);
 
     result = ToEnum(value, "Green");
     assert(!result);
@@ -99,7 +99,7 @@ void ConversionsToFromString()
 
     Color value;
     FromString("Yellow", value);
-    assert(value == Yellow);
+    assert(value == Color::Yellow);
 
     try
     {

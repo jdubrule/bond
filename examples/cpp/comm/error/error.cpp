@@ -64,7 +64,7 @@ int BOND_CALL main()
     {
         boost::ignore_unused(ex);
         // Expect InvalidInvocation when trying to access error payload.
-        assert(bond::comm::ErrorCode::INVALID_INVOCATION == ex.error_code);
+        assert(bond::comm::ErrorCode::INVALID_INVOCATION == static_cast<bond::comm::ErrorCode>(ex.error_code));
     }
 
     return 0;

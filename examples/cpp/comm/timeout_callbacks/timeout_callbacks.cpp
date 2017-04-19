@@ -57,7 +57,7 @@ int BOND_CALL main()
 
     // Expect an error
     assert(response.is_error());
-    assert(bond::comm::ErrorCode::TIMEOUT_ERROR == response.err().error_code());
+    assert(bond::comm::ErrorCode::TIMEOUT_ERROR == static_cast<bond::comm::ErrorCode>(response.err().error_code()));
 
     return 0;
 }
