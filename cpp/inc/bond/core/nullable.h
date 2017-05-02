@@ -20,14 +20,13 @@ namespace detail
 
 template <typename T> struct
 use_value
-{
-    static const bool value = is_list_container<T>::value
-                           || is_set_container<T>::value
-                           || is_map_container<T>::value
-                           || is_string<T>::value
-                           || is_wstring<T>::value
-                           || !is_class<T>::value;
-};
+    : std::integral_constant<bool,
+        is_list_container<T>::value
+        || is_set_container<T>::value
+        || is_map_container<T>::value
+        || is_string<T>::value
+        || is_wstring<T>::value
+        || !is_class<T>::value> {};
 
 template<typename T, typename E = void> struct
 has_compare
@@ -320,14 +319,11 @@ public:
     typedef Allocator   allocator_type;
 
 private:
-    #ifndef BOND_NO_CXX11_ALLOCATOR
-    typedef typename std::allocator_traits<allocator_type>::
-        template rebind_alloc<value_type> rebind_alloc;
+    typedef typename detail::rebind_allocator<allocator_type, value_type>::type rebind_alloc;
 
+#ifndef BOND_NO_CXX11_ALLOCATOR
     typedef typename std::allocator_traits<rebind_alloc>::pointer real_pointer;
 #else
-    typedef typename allocator_type::template rebind<value_type>::other rebind_alloc;
-
     typedef pointer real_pointer;
 #endif
 
@@ -726,8 +722,8 @@ is_list_container<nullable<T, Allocator, useValue> >
     : true_type {};
 
 
-template <typename T, typename Allocator> struct
-is_nullable<nullable<T, Allocator> >
+template <typename T, typename Allocator, bool useValue> struct
+is_nullable<nullable<T, Allocator, useValue> >
     : true_type {};
 
 } // namespace bond

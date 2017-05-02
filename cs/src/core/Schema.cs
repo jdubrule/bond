@@ -8,7 +8,7 @@ namespace Bond
     using System.Diagnostics;
     using System.Linq;
     using System.Reflection;
-    using Bond.Reflection;
+    using Bond.Internal.Reflection;
 
     /// <summary>
     /// Utility to create runtime schema for dynamically specified Bond schema
@@ -186,12 +186,18 @@ namespace Bond
                 }
                 else
                 {
-                    var alias = defaultValue.GetType() != schemaField.GetSchemaType();
+                    Type defaultValueType = defaultValue.GetType();
+                    Type schemaFieldType = schemaField.GetSchemaType();
+
+                    if (schemaFieldType == typeof (Tag.wstring))
+                        schemaFieldType = typeof (string);
+
+                    bool alias = defaultValueType != schemaFieldType;
 
                     switch (schemaField.GetSchemaType().GetBondDataType())
                     {
                         case BondDataType.BT_BOOL:
-                            variant.uint_value = (bool) defaultValue ? 1ul : 0ul;
+                            variant.uint_value = alias ? 0ul : ((bool) defaultValue ? 1ul : 0ul);
                             break;
 
                         case BondDataType.BT_UINT8:
@@ -221,7 +227,7 @@ namespace Bond
                             break;
 
                         case BondDataType.BT_WSTRING:
-                            variant.wstring_value = (string)defaultValue;
+                            variant.wstring_value = alias ? string.Empty : (string)defaultValue;
                             break;
                     }
                 }

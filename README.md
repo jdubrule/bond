@@ -11,16 +11,12 @@ data. It supports cross-language serialization/deserialization and powerful
 generic mechanisms for efficiently manipulating data. Bond is broadly used at
 Microsoft in high scale services.
 
-We are also introducing the
-[Bond Communications framework](https://Microsoft.github.io/bond/manual/bond_comm.html)--known
-as Bond Comm--which allows for remote process communication. This framework is the successor
-to an internal framework that is used by several large services inside
-Microsoft. We have now released versions of Bond Comm for C# and C++. Consult
-the [C# manual](https://Microsoft.github.io/bond/manual/bond_cs.html#bond-comm)
-and the [C++ manual](https://Microsoft.github.io/bond/manual/bond_cpp.html#bond-comm)
-for more details on Bond Comm's usage and capabilities. Note that the wire format should be
-considered firm at this point but the APIs and implementation are still evolving so Bond Comm is
-still considered "pre-1.0".
+**IMPORTANT NOTE: The [Bond Communications framework](https://Microsoft.github.io/bond/manual/bond_comm.html)
+-- known as Bond Comm -- is deprecated. We recommend using
+[Bond-over-gRPC](https://Microsoft.github.io/bond/manual/bond_over_grpc.html) for communication.
+The [Bond Comm C# manual](https://Microsoft.github.io/bond/manual/bond_cs.html#bond-comm)
+and the [Bond Comm C++ manual](https://Microsoft.github.io/bond/manual/bond_cpp.html#bond-comm)
+are preserved for transition purposes.**
 
 Bond is published on GitHub at [https://github.com/Microsoft/bond/](https://github.com/Microsoft/bond/).
 
@@ -44,10 +40,10 @@ git clone --recursive https://github.com/Microsoft/bond.git
 ```
 
 In order to build Bond you will need CMake (3.1+), Haskell (ghc 7.4+ and
-cabal-install 1.18+) and Boost (1.58+). The core Bond C++ library can be used
-with C++03 compilers, although Bond Comm, Python support, unit tests and various
-examples require some C++11 features. (Note: Boost 1.59 may not work with
-Bond Comm due to some bugs in that version of the Boost ASIO library).
+cabal-install 1.18+) and Boost (1.58+). Bond's C++ library requires some
+C++11 features (currently limited to those supported bv Visual C++ 2013).
+(Note: Boost 1.59 may not work with Bond Comm due to some bugs in that
+version of the Boost ASIO library).
 
 Following are specific instructions for building on various platforms.
 
@@ -174,7 +170,7 @@ cmake .. \
 
 ### Windows
 
-[![Build Status](https://ci.appveyor.com/api/projects/status/github/Microsoft/bond?svg=true&branch=master)](https://ci.appveyor.com/project/sapek/bond/branch/master)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/Microsoft/bond?svg=true&branch=master)](https://ci.appveyor.com/project/MicrosoftBond/bond/branch/master)
 
 Install the following tools:
 
@@ -239,12 +235,7 @@ cmake -G "Visual Studio 14 2015 Win64" ..
 
 Setting `PreferredToolArchitecture=x64` selects the 64-bit toolchain which
 dramatically improves build speed. (The Bond unit tests are too big to build
-with 32-bit tools.) This variable works for Visual Studio 2013 or 2015. For
-Visual Studio 2012 set the following environment variable instead:
-
-```bash
-set _IsNativeEnvironment=true
-```
+with 32-bit tools.)
 
 Instead of `cmake` you can also use `cmake-gui` and specify configuration
 settings in the UI. This configuration step has to be performed only once. From

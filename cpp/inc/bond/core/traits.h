@@ -5,6 +5,7 @@
 
 #include "config.h"
 #include "scalar_interface.h"
+#include "bond_fwd.h"
 #include <boost/type_traits/has_nothrow_copy.hpp>
 #include <boost/utility/enable_if.hpp>
 
@@ -14,6 +15,10 @@
 #else
 #   include <boost/type_traits.hpp>
 #   define BOND_TYPE_TRAITS_NAMESPACE ::boost
+#endif
+
+#ifndef BOND_NO_CXX11_ALLOCATOR
+#include <memory>
 #endif
 
 namespace bond
@@ -52,20 +57,18 @@ struct is_nothrow_copy_constructible : boost::has_nothrow_copy_constructor<T> {}
 // is_signed_int
 template <typename T> struct
 is_signed_int
-{
-    static const bool value = is_signed<T>::value
-                          && !is_floating_point<T>::value
-                          && !is_enum<T>::value;
-};
+    : std::integral_constant<bool,
+        is_signed<T>::value
+        && !is_floating_point<T>::value
+        && !is_enum<T>::value> {};
 
 
 // is_signed_int_or_enum
 template <typename T> struct
 is_signed_int_or_enum
-{
-    static const bool value = is_signed_int<T>::value
-                           || is_enum<T>::value;
-};
+    : std::integral_constant<bool,
+        is_signed_int<T>::value
+        || is_enum<T>::value> {};
 
 
 // schema
@@ -125,19 +128,34 @@ enable_protocol_versions
 
 
 // get_protocol_writer
-template <typename Reader, typename OutputStream> struct
+template <typename Reader, typename Output> struct
 get_protocol_writer;
 
-
-template <template <typename T> class Reader, typename I, typename OutputStream> struct
-get_protocol_writer<Reader<I>, OutputStream>
+template <template <typename T> class Reader, typename I, typename Output> struct
+get_protocol_writer<Reader<I>, Output>
 {
-    typedef typename Reader<OutputStream>::Writer type;
+    typedef typename Reader<Output>::Writer type;
+};
+
+template <template <typename T, typename U> class Reader, typename Input, typename MarshaledBondedProtocols, typename Output> struct
+get_protocol_writer<Reader<Input, MarshaledBondedProtocols>, Output>
+{
+    typedef typename Reader<Output, MarshaledBondedProtocols>::Writer type;
 };
 
 
 template <typename T, T> struct
 check_method
+    : true_type {};
+
+
+template <typename T> struct
+is_bonded
+    : false_type {};
+
+
+template <typename T, typename Reader> struct
+is_bonded<bonded<T, Reader> >
     : true_type {};
 
 
@@ -150,5 +168,27 @@ template <typename T> struct
 is_type_alias
     : is_object<typename aliased_type<T>::type> {};
 
+namespace detail
+{
+
+template<typename A, typename T>
+struct rebind_allocator {
+#ifndef BOND_NO_CXX11_ALLOCATOR
+    typedef typename std::allocator_traits<A>::template rebind_alloc<T> type;
+#else
+    typedef typename A::template rebind<T>::other type;
+#endif
+};
+
+
+template<typename A>
+struct is_default_allocator
+    : false_type { };
+
+template<typename T>
+struct is_default_allocator<std::allocator<T> >
+    : true_type { };
+
+} // namespace detail
 
 } // namespace bond

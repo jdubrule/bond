@@ -7,21 +7,19 @@ Bond is an extensible framework for working with schematized data. It is
 suitable for scenarios ranging from service communications to Big Data storage
 and processing.
 
-Bond defines a rich type system and schema versioning rules which allow
-forward and backward compatibility. The core Bond features include high
-performance serialization/deserialization and a very powerful, generic data
-transform mechanism. The framework is highly extensible via pluggable
+Bond defines a rich type system and [schema evolution rules](#schema-evolution)
+which allow forward and backward compatibility. The core Bond features include
+high performance serialization/deserialization and a very powerful, generic
+data transform mechanism. The framework is highly extensible via pluggable
 serialization protocols, data streams, user defined type aliases and more.
 
 By design Bond is language and platform independent and is currently supported
-for C++, C#, and Python on Linux, OS X and Windows.
-
-We are also introducing the
-[Bond Communications framework](https://Microsoft.github.io/bond/manual/bond_comm.html)--known
-as Bond Comm. More information about Bond Comm for C# can be found
-[below](#bond-comm).
+for C++, C#, and Python on Linux, OS X and Windows.     
 
 Bond is published on GitHub at [https://github.com/Microsoft/bond/](https://github.com/Microsoft/bond/).
+
+**IMPORTANT NOTE: Bond Comm is deprecated. We recommend using
+[Bond-over-gRPC](bond_over_grpc.html) for communication.**
 
 Basic example
 =============
@@ -261,6 +259,186 @@ See also the following example:
 
 - `examples/cs/core/marshaling`
 
+Schema evolution
+================
+
+Bond does not use explicit versioning to deal with changes to schemas (and the
+resulting types) over time. Instead, Bond supports certain schema evolution
+operations which allow the producer and consumer of Bond types to evolve
+without lockstep coordination.
+
+The following changes to a schema will never break compatibility across the wire:
+
+- Adding or removing an `optional` or `required_optional` field
+- Changing a field's type between `int32` and `enum`
+- Changing a field's type between `vector<T>` and `list<T>`
+- Changing a field's type between `blob` and `vector<uint8>` or `blob` and
+  `list<uint8>`
+- Changing a field's type between `T` and `bonded<T>`
+- Adding new enumeration constants that don't alter existing constants (beware
+  of implicit reordering)
+
+The following changes to a type are generally safe but require some
+consideration about how the change is rolled out:
+
+- Changing a field between `optional` and `required_optional` or between
+  `required_optional` and `required`. The `required_optional` modifier
+  facilitates a two-step process for changing between `optional` and
+  `required`, but the first step must be completed on both the producer and the
+  consumer sides before the second step can be started on either side.
+- Promoting a field with a numeric type from a smaller size to a larger size
+  (e.g.: `float` to `double`, `uint8` to `uint16`, `uint8` to `uint32`, `int8`
+  to `int16`, etc.). The consumer must get the change before the producer.
+  Note that changing from unsigned to signed or vice versa is *not* compatible
+  (e.g.: `uint8` to `int16`).
+- Promoting from `int8` or `int16` to `enum`. The consumer must get the change
+  before the producer.
+
+These following changes will break wire compatibility and are not recommended:
+
+- Adding or removing `required` fields
+- Incompatible change of field types (any type change *not* covered above); e.g.:
+  `int32` to `string`, `string` to `wstring`
+- Changing of field ordinals
+- Changing of inheritance hierarchy (add/remove/substituting base struct)
+- Changing between `required` and `optional` directly
+- Changing the default value of a field
+- Changing existing enumeration constants in any way (including implicit
+  renumbering)
+
+Some best practices and other considerations to keep in mind:
+
+- When removing a field, comment it out rather than removing it altogether so
+  that the field ordinal is not reused in future edits of the schema
+- When working with untagged protocols like
+  [SimpleBinaryProtocol](#simple-binary), great care must be taken to ensure
+  the same [schema](#runtime-schema) is used when deserializing the payload as
+  was used to serialize it.
+- Caution should be used when changing or reusing field names as this could
+  break text-based protocols like [SimpleJsonProtocol](#simple-json)
+- `required` should be used sparingly and only with careful consideration
+
+Protocols
+=========
+
+Bond protocols are pluggable, allowing application to choose the most
+appropriate encoding format. Bond supports three kinds of protocols:
+
+  - Tagged protocols
+
+    Tagged protocols interleave schema metadata within the payload. This makes
+    the payload self-describing, allowing consumers to interpret it even
+    without knowing the schema used by the producer.
+
+  - Untagged protocols
+
+    Untagged protocols serialize only data and thus require that consumers know 
+    the payload schema via some out-of-band mechanism. Untagged protocols are 
+    often used in storage scenarios because they allow storing a 
+    [schema](#runtime-schema) once (e.g. in a system table in a database) and 
+    thus eliminating metadata overhead from many records using the same schema.
+
+  - DOM-based protocols
+
+    DOM-based protocol parse whole payload into an in-memory Data Object Model
+    which then is queried during deserialization. Typically this kind of
+    protocol is used to implement text based encoding such as JSON or XML.
+
+Compact Binary
+--------------
+
+A binary, tagged protocol using variable integer encoding and compact field
+header. A good choice, along with [Fast Binary](#fast-binary), for RPC
+scenarios. 
+
+Implemented in `CompactBinaryReader` and `CompactBinaryWriter` classes.
+Version 2 of Compact Binary adds length prefix for structs. This enables
+deserialization of [`bonded<T>`](#understanding-bondedt) and skipping of
+unknown struct fields in constant time. The trade-off is double pass encoding,
+resulting in up to 30% slower serialization performance. 
+
+See also [Compact Binary encoding reference][compact_binary_format_reference].
+
+Fast Binary
+-----------
+
+A binary, tagged protocol similar to [Compact Binary](#compact-binary) but 
+optimized for deserialization speed rather than payload compactness.
+
+Implemented in `FastBinaryReader` and`FastBinaryWriter` classes. 
+
+See also [Fast Binary encoding reference][fast_binary_format_reference].
+
+Simple Binary
+-------------
+
+A binary, untagged protocol which is a good choice for storage scenarios as it
+offers potential for big saving on payload size. Because Simple is an untagged
+protocol, it requires that the payload schema is available during
+deserialization. In typical storage scenario application would store [runtime
+schema](#runtime-schema) and use it during deserialization with `BondedVoid`.
+In some specific scenarios when it can be assumed that producer and consumer
+have exactly the same schema, SimpleProtocol can be used with compile-time
+schema, providing unparalleled deserialization performance. One example is
+marshaling objects between processes or between native and managed components.
+
+Implemented in `SimpleBinaryReader` and `SimpleBinaryWriter` classes.
+
+Version 2 of Simple Protocol uses variable integer encoding for string and 
+container lengths, resulting in more compact payload without measurable 
+performance impact.
+
+See example: `examples/cs/core/untagged_protocols`.
+
+Simple JSON
+-----------
+
+The Simple JSON protocol is a simple JSON encoding implemented as a DOM
+protocol. The output is standard JSON and is a very good choice for
+interoperating with other systems or generating human readable payload.
+
+Because the payload doesn't include field ordinals, there are two caveats
+when used as a Bond serialization protocol:
+
+- Transcoding from Simple JSON to binary Bond protocols is not supported
+  (transcoding from a binary protocol to Simple JSON is supported if you
+  have the schema).
+- Field matching is done by field name rather than ordinal. The implication
+  is that renaming a field (which is considered a bad practice anyways) is a
+  breaking schema change for Simple JSON.
+
+Simple JSON also flattens the inheritance hierarchy which may lead to name
+conflicts between fields of base and derived Bond structs. It is possible to
+resolve such conflicts without the need to actually rename the fields by
+annotating fields with `JsonName` attribute, e.g.:
+
+    struct Base
+    {
+        0: string foo;
+    }
+
+    struct Derived : Base
+    {
+        [JsonName("DerivedFoo")]
+        0: string foo;
+    }
+
+Note that Simple JSON is not designed to be able to read arbitrary JSON
+objects. Simple JSON has its own way of encoding Bond objects in JSON that
+differs from how other libraries would encode the same object. When
+interoperating with other JSON libraries, be aware of these differences:
+
+- maps are encoded as arrays of key/value pairs not as sub-objects
+- the inheritance hierarchy is flattened
+- nulls are expressed as empty arrays
+- enums are encoded via their numeric value, not their symbolic names
+
+Implemented in `SimpleJsonReader` and `SimpleJsonWriter` classes.
+
+See examples:
+
+- `examples/cs/core/simple_json`
+
 Transcoder
 ==========
 
@@ -315,19 +493,24 @@ See also the following example:
 Input and output streams
 ========================
 
-The input and output for binary protocols is provided by `IInputStream` and
-`IOutputStream` interfaces. Bond comes with standard implementations of these
-interfaces for memory buffers and `System.IO.Stream`, and applications can
-provide their own custom implementations.
+The input and output for binary protocols is provided by the
+[`IInputStream`](https://github.com/Microsoft/bond/blob/master/cs/src/core/io/IInputStream.cs)
+and
+[`IOutputStream`](https://github.com/Microsoft/bond/blob/master/cs/src/core/io/IOutputStream.cs)
+interfaces. Bond comes with standard implementations of these interfaces for
+memory buffers and `System.IO.Stream`. Applications can also provide their
+own custom implementations.
 
-The `OutputBuffer` class implements `IOutputStream` interface on top of
-a memory buffer. It comes in two variants. `Bond.IO.Safe.OutputBuffer` uses
-only safe managed code and is included in `Bond.dll` assembly which is
-compatible with Portable Class Library. `Bond.IO.Unsafe.OutputBuffer` uses
-unsafe code to optimize for performance. It is included in `Bond.IO.dll`
-assembly which requires full .NET runtime. Both implementations have identical
-class names and APIs, the only difference is the namespace in which they are
-defined.
+The `OutputBuffer` class implements the `IOutputStream` interface on top of
+a memory buffer. It comes in two variants.
+[`Bond.IO.Safe.OutputBuffer`](https://github.com/Microsoft/bond/blob/master/cs/src/core/io/safe/OutputBuffer.cs)
+uses only safe managed code and is included in the `Bond.dll` assembly which
+is a Portable Class Library.
+[`Bond.IO.Unsafe.OutputBuffer`](https://github.com/Microsoft/bond/blob/master/cs/src/io/unsafe/OutputBuffer.cs)
+uses unsafe code to optimize for performance. It is included in the
+`Bond.IO.dll` assembly, which requires a full .NET runtime. Both
+implementations have identical class names and APIs; the only difference is
+the namespace in which they are defined.
 
     // Create an output buffer with initial size of 16KB
     var output = new OutputBuffer(16 * 1024);
@@ -338,22 +521,29 @@ defined.
     // Get the serialized payload form the output buffer
     ArraySegment<byte> data = output.Data;
 
-The `InputBuffer` class implements `IInputStream` interface on top of a memory
-buffer. Like `OutputBuffer` it comes in two flavors, the safe and portable
-`Bond.IO.Safe.OutputBuffer`, and the performance optimized via use of unsafe
-code `Bond.IO.Unsafe.OutputBuffer`.
+The
+[`InputBuffer`](https://github.com/Microsoft/bond/blob/master/cs/src/core/io/safe/InputBuffer.cs)
+class implements the `IInputStream` interface on top of a memory buffer.
+Like `OutputBuffer` it comes in two flavors, the safe and portable
+[`Bond.IO.Safe.InputBuffer`](https://github.com/Microsoft/bond/blob/master/cs/src/core/io/safe/InputBuffer.cs),
+and the performance optimized via use of unsafe code
+[`Bond.IO.Unsafe.InputBuffer`](https://github.com/Microsoft/bond/blob/master/cs/src/io/unsafe/InputBuffer.cs).
 
     // Create an input buffer on top of a byte[]
     var input = new InputBuffer(byteArray);
     var reader = new CompactBinaryReader<InputBuffer>(input);
 
-The `InputStream` and `OutputStream` classes provide implementations of
-`IInputStream` and `IOutputStream` on top of `System.IO.Stream`. These classes
-are included in `Bond.IO.dll` and thus are only available to applications using
-full .NET runtime and allowing unsafe code. `In/OutputStream` can be used with
-any `Stream`, including `MemoryStream`, however aforementioned the
-`In/OutputBuffer` provide significantly better performance and are recommended
-when working with in-memory payloads.
+The
+[`InputStream`](https://github.com/Microsoft/bond/blob/master/cs/src/io/unsafe/InputStream.cs)
+and
+[`OutputStream`](https://github.com/Microsoft/bond/blob/master/cs/src/io/unsafe/OutputStream.cs)
+classes provide implementations of `IInputStream` and `IOutputStream` on top
+of `System.IO.Stream`. These classes are included in `Bond.IO.dll` and thus
+are only available to applications using a full .NET runtime and allowing
+unsafe code. `In/OutputStream` can be used with any `Stream`, including
+`MemoryStream`. However `InputBuffer` and `OutputBuffer` provide
+significantly better performance and are recommended when working with
+in-memory payloads.
 
     using (var stream = new FileStream("example.bin", FileMode.Open))
     {
@@ -1214,6 +1404,10 @@ the version of the assembly that targets a lower version of the framework.
 Bond Comm
 =========
 
+**IMPORTANT NOTE: Bond Comm is deprecated. We recommend using
+[Bond-over-gRPC](bond_over_grpc.html) for communication. This documentation
+is retained for transitional purposes.**
+
 The [Bond Communications framework](bond_comm.html) in C# makes it easy and
 efficent to construct services and hook clients up to those services. Built
 on top of the Bond serialization framework, Bond Comm aims for the same
@@ -1274,10 +1468,6 @@ See the following examples:
 - `examples/cs/comm/logging`
 - `examples/cs/comm/metrics`
 
-### Roadmap ###
-
-We have a [brief roadmap](bond_comm_roadmap.html) for Bond Comm.
-
 ### Comm NuGet Packages ###
 
 Bond Comm is split into a number of NuGet packages to allow for granular
@@ -1318,7 +1508,18 @@ References
 [Bond Comm overview][bond_comm]
 ----------------------------
 
+[Bond-over-gRPC overview][bond_over_grpc]
+----------------------------
+
+[bond_over_grpc]: bond_over_grpc.html
 [bond_comm]: bond_comm.html
 [bond_cpp]: bond_cpp.html
 [bond_py]: bond_py.html
 [compiler]: compiler.html
+
+[compact_binary_format_reference]: 
+../reference/cpp/compact__binary_8h_source.html
+
+[fast_binary_format_reference]: 
+../reference/cpp/fast__binary_8h_source.html
+

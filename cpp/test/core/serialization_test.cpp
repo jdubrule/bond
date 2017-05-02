@@ -21,15 +21,19 @@ TEST_CASE_BEGIN(Streaming)
 
     InitRandom(from1);
     InitRandom(from2);
-    
-    typename Writer::Buffer buffer;
-    Writer writer(buffer);
-    
-    // Serialize 2 records
-    bond::Serialize(from1, writer);
-    bond::Serialize(from2, writer);
 
-    bond::blob data = buffer.GetBuffer();
+    bond::blob data;
+
+    {
+        typename Writer::Buffer buffer;
+        Writer writer(buffer);
+
+        // Serialize 2 records
+        bond::Serialize(from1, writer);
+        bond::Serialize(from2, writer);
+
+        data = buffer.GetBuffer();
+    }
 
     {
         Reader reader(data);
@@ -54,7 +58,7 @@ TEST_CASE_BEGIN(Streaming)
         typename rebind_buffer_by_reference<Reader>::type reader(buffer);
 
         T to1, to2;
-        
+
         Deserialize(reader, to1);
 
         UT_AssertIsFalse(buffer.IsEof());
@@ -71,7 +75,7 @@ TEST_CASE_END
 
 
 // 1 bit per every 8 fields
-// This simplified count obviously doesn't work for nested structures but 
+// This simplified count obviously doesn't work for nested structures but
 // the tests that check payload length don't use nested structs.
 template <typename T> struct
 untagged_payload_size
@@ -217,43 +221,41 @@ void SimpleStructTests(const char* name)
 {
     UnitTestSuite suite(name);
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         SerializeAPIs, Reader, Writer, NestedStruct>(suite, "De/serialization APIs");
 
-    AddTestCase<COND_TEST_ID(N, (!bond::uses_dom_parser<Reader>::value)), 
+    AddTestCase<COND_TEST_ID(N, (!bond::uses_dom_parser<Reader>::value)),
         MarshalAPIs, Reader, Writer, NestedStruct>(suite, "Un/marshal APIs");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         AllBindingAndMapping1, Reader, Writer, SimpleStruct>(suite, "Simple struct");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         AllBindingAndMapping1, Reader, Writer, UsingImport>(suite, "Imported struct");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         DefaultValues, Reader, Writer, StructWithDefaults>(suite, "Omitting default values");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         DefaultValues, Reader, Writer, OptionalContainers>(suite, "Omitting empty containers");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         AllBindingAndMapping2, Reader, Writer, NestedStruct1, NestedStruct1OptionalBondedView>(suite, "Optional bonded field");
 
-#ifndef UNIT_TEST_SUBSET
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         AllBindingAndMapping2, Reader, Writer, SimpleStruct, SimpleStructView>(suite, "Simple struct partial view");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         AllBindingAndMapping1, Reader, Writer, NestedStruct>(suite, "Nested struct");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         AllBindingAndMapping2, Reader, Writer, NestedStruct, NestedStructView>(suite, "Nested struct partial view");
 
-    AddTestCase<COND_TEST_ID(N, (!bond::uses_dom_parser<Reader>::value)), 
-		Streaming, Reader, Writer, SimpleStruct>(suite, "Record streaming");
-	
- 	AddTestCase<TEST_ID(N),
- 		SerializeAPIs, Reader, Writer, EnumValueWrapper>(suite, "Struct with alias-wrapped enum");
-#endif
+    AddTestCase<COND_TEST_ID(N, (!bond::uses_dom_parser<Reader>::value)),
+        Streaming, Reader, Writer, SimpleStruct>(suite, "Record streaming");
+
+    AddTestCase<TEST_ID(N),
+        SerializeAPIs, Reader, Writer, EnumValueWrapper>(suite, "Struct with alias-wrapped enum");
 }
 
 
@@ -262,13 +264,13 @@ void OmittingDefaultsTests(const char* name)
 {
     UnitTestSuite suite(name);
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         DefaultValues, Reader, Writer, StructWithDefaults>(suite, "Omitting default values");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         DefaultValues, Reader, Writer, OptionalContainers>(suite, "Omitting empty containers");
 
-    AddTestCase<TEST_ID(N), 
+    AddTestCase<TEST_ID(N),
         DefaultValues, Reader, Writer, OptionalNothing>(suite, "Omitting nothing");
 }
 
@@ -315,4 +317,3 @@ bool init_unit_test()
     SerializationTest::Initialize();
     return true;
 }
-

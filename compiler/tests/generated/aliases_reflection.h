@@ -21,14 +21,14 @@ namespace tests
         public: struct var
         {
             // aa
-            typedef ::bond::reflection::FieldTemplate<
+            typedef struct : ::bond::reflection::FieldTemplate<
                 0,
                 ::bond::reflection::optional_field_modifier,
                 Foo<T>,
                 std::vector<std::vector<T> >,
                 &Foo<T>::aa,
                 &s_aa_metadata
-            > aa;
+            > {}  aa;
         };
 
         private: typedef boost::mpl::list<> fields0;

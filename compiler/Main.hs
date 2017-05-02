@@ -70,38 +70,46 @@ cppCodegen :: Options -> IO()
 cppCodegen options@Cpp {..} = do
     let typeMapping = maybe cppTypeMapping cppCustomAllocTypeMapping allocator
     concurrentlyFor_ files $ codeGen options typeMapping $
-        [ reflection_h
-        , types_cpp
-        , types_comm_cpp
+        [ reflection_h export_attribute
         , types_h header enum_header allocator
-        , apply_h applyProto apply_attribute
+        , types_cpp
+        , apply_h applyProto export_attribute
         , apply_cpp applyProto
-        , comm_h
+        , comm_h export_attribute
+        , comm_cpp
         ] <>
         [ enum_h | enum_header]
   where
     applyProto = map snd $ filter (enabled apply) protocols
     enabled a p = null a || fst p `elem` a
     protocols =
-        [ (Compact, Protocol " ::bond::CompactBinaryReader< ::bond::InputBuffer>"
-                             " ::bond::CompactBinaryWriter< ::bond::OutputBuffer>")
-        , (Fast,    Protocol " ::bond::FastBinaryReader< ::bond::InputBuffer>"
-                             " ::bond::FastBinaryWriter< ::bond::OutputBuffer>")
-        , (Simple,  Protocol " ::bond::SimpleBinaryReader< ::bond::InputBuffer>"
-                             " ::bond::SimpleBinaryWriter< ::bond::OutputBuffer>")
+        [ (Compact, ProtocolReader " ::bond::CompactBinaryReader< ::bond::InputBuffer>")
+        , (Compact, ProtocolWriter " ::bond::CompactBinaryWriter< ::bond::OutputBuffer>")
+        , (Compact, ProtocolWriter " ::bond::CompactBinaryWriter< ::bond::CompactBinaryCounter::type>")
+        , (Fast,    ProtocolReader " ::bond::FastBinaryReader< ::bond::InputBuffer>")
+        , (Fast,    ProtocolWriter " ::bond::FastBinaryWriter< ::bond::OutputBuffer>")
+        , (Simple,  ProtocolReader " ::bond::SimpleBinaryReader< ::bond::InputBuffer>")
+        , (Simple,  ProtocolWriter " ::bond::SimpleBinaryWriter< ::bond::OutputBuffer>")
         ]
 cppCodegen _ = error "cppCodegen: impossible happened."
 
 csCodegen :: Options -> IO()
 csCodegen options@Cs {..} = do
-    let fieldMapping = if readonly_properties
+    concurrentlyFor_ files $ codeGen options typeMapping templates
+  where
+    typeMapping = if collection_interfaces
+            then csCollectionInterfacesTypeMapping
+            else csTypeMapping
+    fieldMapping = if readonly_properties
             then ReadOnlyProperties
             else if fields
                  then PublicFields
                  else Properties
-    let typeMapping = if collection_interfaces then csCollectionInterfacesTypeMapping else csTypeMapping
-    let templates = [ comm_interface_cs , comm_proxy_cs , comm_service_cs , types_cs Class fieldMapping ]
-    concurrentlyFor_ files $ codeGen options typeMapping templates
+    templates = concat $ map snd $ filter fst codegen_templates
+    codegen_templates = [ (structs_enabled, [types_cs Class fieldMapping])
+                        , (comm_enabled, [comm_interface_cs, comm_proxy_cs, comm_service_cs])
+                        , (grpc_enabled, [grpc_cs])
+                        ]
 csCodegen _ = error "csCodegen: impossible happened."
 
 codeGen :: Options -> TypeMapping -> [Template] -> FilePath -> IO ()

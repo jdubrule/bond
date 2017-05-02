@@ -12,10 +12,10 @@ using Wrapper<T> = T;
 
 enum EnumToWrap
 {
-	anEnumValue
+    anEnumValue
 }
 
 struct WrappingAnEnum
 {
-	0: Wrapper<EnumToWrap> aWrappedEnum = anEnumValue;
+    0: Wrapper<EnumToWrap> aWrappedEnum = anEnumValue;
 }

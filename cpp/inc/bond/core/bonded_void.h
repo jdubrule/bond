@@ -111,7 +111,14 @@ public:
     template <typename T>
     void Deserialize(bonded<T>& var) const
     {
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4127) // C4127: conditional expression is constant
+#endif
         if (uses_marshaled_bonded<Reader>::value && _schema.GetType().bonded_type)
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
         {
             bonded<T> tmp;
             _SelectProtocolAndApply(boost::ref(tmp));
@@ -134,11 +141,11 @@ public:
 
     template <typename Transform, typename U, typename ReaderT>
     friend typename boost::disable_if<detail::need_double_pass<Transform>, bool>::type inline
-    Apply(const Transform& transform, const bonded<U, ReaderT>& bonded);
+    detail::ApplyTransform(const Transform& transform, const bonded<U, ReaderT>& bonded);
 
     template <typename Transform, typename U, typename ReaderT>
     friend typename boost::enable_if<detail::need_double_pass<Transform>, bool>::type inline
-    Apply(const Transform& transform, const bonded<U, ReaderT>& bonded);
+    detail::ApplyTransform(const Transform& transform, const bonded<U, ReaderT>& bonded);
 
     template <typename T, typename ReaderT>
     friend class bonded;
@@ -148,7 +155,14 @@ private:
     template <typename Transform>
     bool _Apply(const Transform& transform) const
     {
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4127) // C4127: conditional expression is constant
+#endif
         if (uses_marshaled_bonded<Reader>::value && _schema.GetType().bonded_type)
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
         {
             return _SelectProtocolAndApply(transform);
         }
@@ -165,7 +179,7 @@ private:
     _SelectProtocolAndApply(const Transform& transform) const
     {
         _skip = false;
-        InputBuffer input(detail::ReadBlob(_data));
+        auto input = CreateInputBuffer(_data.GetBuffer(), detail::ReadBlob(_data));
         return SelectProtocolAndApply(_schema, input, transform).second;
     }
 
