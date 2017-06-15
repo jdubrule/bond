@@ -16,8 +16,8 @@ different versioning scheme, following the Haskell community's
 * IDL core version: TBD
 * IDL comm version: TBD
 * C++ version: TBD (major bump needed)
-* C# NuGet version: TBD
-* C# Comm NuGet version: TBD
+* C# NuGet version: (major bump needed)
+* C# Comm NuGet version: (minor bump needed, dependencies updated)
 
 ### `gbc` and Bond compiler library ###
 
@@ -53,6 +53,14 @@ different versioning scheme, following the Haskell community's
       and
       [the bf example](https://github.com/Microsoft/bond/commit/11beaf5319639e4bdee96a25f95154e4fed93a75#diff-bdda0f39d99280d4858b4453906eea17)
       for more details.
+* **Breaking change** The `bond::customize<protocols>` has been removed. All the
+  public APIs that require a protocol list (e.g. `bond::Marshal`) now accept
+  an extra template argument `Protocols` which defaults to `bond::BuiltInProtocols`.
+  Custom input streams now require `bond::type_id<>` to be specialized with a
+  unique magic number. For more details please see [the bf example](https://github.com/Microsoft/bond/tree/master/examples/cpp/core/bf).
+* Initial support for sending
+  [Bond objects over gRPC](https://microsoft.github.io/bond/manual/bond_over_grpc.html)
+  has been added.
 * The `bond::Apply` function now has a uniform signature. Call sites for
 the `Marshaler<Writer>` transform overload that were _mistakenly_ passing
 `Writer` explicitly (e.g. `bond::Apply<Writer>(marshaler, value)`) will now
@@ -66,8 +74,13 @@ get a compiler error. To fix, remove the `<Writer>` part:
   support which was broken for some scenarios.
 * For Visual C++ 2017 compability, RapidJSON v1.0.0 or newer is now
   required. The RapidJSON submodule that Bond uses by default has been
-  updated to v1.0.0.
+  updated to v1.1.0 due to a warning from clang in earlier versions.
 * C++ codegen hides FieldTemplate details, shortening symbol names.
+
+### C# ###
+
+* **Breaking change** The deprecated type `Bond.BondReflection` has been
+  removed. The type `Bond.Reflection` should be used instead.
 
 ## 5.3.1: 2017-04-25 ##
 
