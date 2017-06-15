@@ -136,6 +136,7 @@ namespace detail
             SchemaDef s;
             s.root.id = BondDataType::BT_STRUCT;
             s.structs.resize(1);
+            return s;
         }
 
     private:

@@ -457,7 +457,7 @@ inline MatchingMapByKey(T& var, BondDataType keyType, const E& element, Reader& 
         case bond::BondDataType::BT_FLOAT:
             return DeserializeMapElements<Protocols>(var, value<float, Reader&>(input, false), element, size);
 
-        case bond::BondDataType::BT_FLOAT:
+        case bond::BondDataType::BT_DOUBLE:
             return DeserializeMapElements<Protocols>(var, value<double, Reader&>(input, false), element, size);
 
         default:
