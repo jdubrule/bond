@@ -6,6 +6,7 @@ import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit (testCase)
 import Tests.Syntax
 import Tests.Codegen
+import Tests.Codegen.Util(utilTestGroup)
 
 tests :: TestTree
 tests = testGroup "Compiler tests"
@@ -52,9 +53,11 @@ tests = testGroup "Compiler tests"
         , testCase "Enum no default value" $ failBadSyntax "Should fail when an enum field has no default value" "enum_no_default"
         , testCase "Alias default value" $ failBadSyntax "Should fail when underlying default value is of the wrong type" "aliases_default"
         , testCase "Out of range" $ failBadSyntax "Should fail, out of range for int16" "int_out_of_range"
+        , testCase "Duplicate method definition in service" $ failBadSyntax "Should fail, method name should be unique" "duplicate_service_method"
         ]
     , testGroup "Codegen"
-        [ testGroup "C++"
+        [ utilTestGroup,
+          testGroup "C++"
             [ verifyCppCodegen "attributes"
             , verifyCppCodegen "basic_types"
             , verifyCppCodegen "bond_meta"
@@ -67,6 +70,11 @@ tests = testGroup "Compiler tests"
             , verifyCppCodegen "aliases"
             , verifyCppCodegen "alias_key"
             , verifyCppCodegen "maybe_blob"
+            , verifyCodegen
+                [ "c++"
+                , "--enum-header"
+                ]
+                "with_enum_header"
             , verifyCodegen
                 [ "c++"
                 , "--allocator=arena"
@@ -92,12 +100,20 @@ tests = testGroup "Compiler tests"
                 , "--using=String=my::string"
                 ]
                 "custom_alias_without_allocator"
-            , verifyApplyCodegen
-                [ "c++"
-                , "--apply-attribute=DllExport"
+           , testGroup "Apply"
+                [ verifyApplyCodegen
+                    [ "c++"
+                    , "--apply-attribute=DllExport"
+                    ]
+                    "basic_types"
                 ]
-                "basic_types"
-            ]
+           , testGroup "Exports"
+                [ verifyExportsCodegen
+                    [ "c++"
+                    , "--export-attribute=DllExport"
+                    ]
+                    "service"
+                ]
             , testGroup "Comm"
                 [ verifyCppCommCodegen
                     [ "c++"
@@ -112,7 +128,22 @@ tests = testGroup "Compiler tests"
                     ]
                     "service_attributes"
                 ]
-    , testGroup "C#"
+            , testGroup "Grpc"
+                [ verifyCppGrpcCodegen
+                    [ "c++"
+                    ]
+                    "service"
+                , verifyCppGrpcCodegen
+                    [ "c++"
+                    ]
+                    "generic_service"
+                , verifyCppGrpcCodegen
+                    [ "c++"
+                    ]
+                    "service_attributes"
+                ]
+            ]
+        , testGroup "C#"
             [ verifyCsCodegen "attributes"
             , verifyCsCodegen "basic_types"
             , verifyCsCodegen "bond_meta"

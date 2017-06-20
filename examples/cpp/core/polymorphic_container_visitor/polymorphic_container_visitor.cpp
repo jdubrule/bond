@@ -4,6 +4,8 @@
 #include <bond/core/bond.h>
 #include <bond/stream/output_buffer.h>
 
+#include "boost/mpl/list.hpp"
+
 using namespace examples::polymorphic_containers;
 
 

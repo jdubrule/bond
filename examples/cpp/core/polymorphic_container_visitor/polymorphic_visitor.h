@@ -2,6 +2,7 @@
 
 #include <bond/core/bond.h>
 #include "boost/mpl/for_each.hpp"
+#include "boost/mpl/transform.hpp"
 
 namespace polymorphic
 {

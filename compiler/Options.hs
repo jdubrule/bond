@@ -35,9 +35,12 @@ data Options
         , enum_header :: Bool
         , allocator :: Maybe String
         , apply :: [ApplyOptions]
-        , apply_attribute :: Maybe String
+        , export_attribute :: Maybe String
         , jobs :: Maybe Int
         , no_banner :: Bool
+        , core_enabled :: Bool
+        , comm_enabled :: Bool
+        , grpc_enabled :: Bool
         }
     | Cs
         { files :: [FilePath]
@@ -50,6 +53,9 @@ data Options
         , fields :: Bool
         , jobs :: Maybe Int
         , no_banner :: Bool
+        , structs_enabled :: Bool
+        , comm_enabled :: Bool
+        , grpc_enabled :: Bool
         }
     | Schema
         { files :: [FilePath]
@@ -71,9 +77,12 @@ cpp = Cpp
     , enum_header = def &= name "e" &= help "Generate enums into a separate header file"
     , allocator = def &= typ "ALLOCATOR" &= help "Generate types using the specified  allocator"
     , apply = def &= typ "PROTOCOL" &= help "Generate Apply function overloads for the specified protocol only; supported protocols: compact, fast and simple"
-    , apply_attribute = def &= typ "ATTRIBUTE" &= help "Prefix the declarations of Apply functions with the specified C++ attribute/declspec"
+    , export_attribute = def &= typ "ATTRIBUTE" &= explicit &= name "apply-attribute" &= name "export-attribute" &= help "Prefix declarations for library export with the specified C++ attribute/declspec. apply-attribute is a deprecated synonym."
     , jobs = def &= opt "0" &= typ "NUM" &= name "j" &= help "Run NUM jobs simultaneously (or '$ncpus' if no NUM is not given)"
     , no_banner = def &= help "Omit the banner at the top of generated files"
+    , core_enabled = True &= explicit &= name "core" &= help "Generate core serialization definitions (true by default, --core=false to disable)"
+    , comm_enabled = False &= explicit &= name "comm" &= help "Generate comm definitions"
+    , grpc_enabled = False &= explicit &= name "grpc" &= help "Generate gRPC definitions"
     } &=
     name "c++" &=
     help "Generate C++ code"
@@ -83,6 +92,9 @@ cs = Cs
     { collection_interfaces = def &= name "c" &= help "Use interfaces rather than concrete collection types"
     , readonly_properties = def &= name "r" &= help "Generate private property setters"
     , fields = def &= name "f" &= help "Generate public fields rather than properties"
+    , structs_enabled = True &= explicit &= name "structs" &= help "Generate C# types for Bond structs and enums (true by default, use \"--structs=false\" to disable)"
+    , comm_enabled = False &= explicit &= name "comm" &= help "Generate C# services and proxies for Bond Comm"
+    , grpc_enabled = False &= explicit &= name "grpc" &= help "Generate C# services and proxies for gRPC"
     } &=
     name "c#" &=
     help "Generate C# code"
@@ -93,7 +105,6 @@ schema = Schema
     } &=
     name "schema" &=
     help "Output the JSON representation of the schema"
-
 
 mode :: Mode (CmdArgs Options)
 mode = cmdArgsMode $ modes [cpp, cs, schema] &=

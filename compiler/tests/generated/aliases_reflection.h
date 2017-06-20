@@ -21,14 +21,14 @@ namespace tests
         public: struct var
         {
             // aa
-            typedef ::bond::reflection::FieldTemplate<
+            typedef struct : ::bond::reflection::FieldTemplate<
                 0,
                 ::bond::reflection::optional_field_modifier,
                 Foo<T>,
                 std::vector<std::vector<T> >,
                 &Foo<T>::aa,
                 &s_aa_metadata
-            > aa;
+            > {}  aa;
         };
 
         private: typedef boost::mpl::list<> fields0;
@@ -58,6 +58,45 @@ namespace tests
     template <typename T>
     const ::bond::Metadata Foo<T>::Schema::s_aa_metadata
         = ::bond::reflection::MetadataInit("aa");
+
+    //
+    // WrappingAnEnum
+    //
+    struct WrappingAnEnum::Schema
+    {
+        typedef ::bond::no_base base;
+
+        static const ::bond::Metadata metadata;
+        
+        private: static const ::bond::Metadata s_aWrappedEnum_metadata;
+
+        public: struct var
+        {
+            // aWrappedEnum
+            typedef ::bond::reflection::FieldTemplate<
+                0,
+                ::bond::reflection::optional_field_modifier,
+                WrappingAnEnum,
+                ::tests::EnumToWrap,
+                &WrappingAnEnum::aWrappedEnum,
+                &s_aWrappedEnum_metadata
+            > aWrappedEnum;
+        };
+
+        private: typedef boost::mpl::list<> fields0;
+        private: typedef boost::mpl::push_front<fields0, var::aWrappedEnum>::type fields1;
+
+        public: typedef fields1::type fields;
+        
+        
+        static ::bond::Metadata GetMetadata()
+        {
+            return ::bond::reflection::MetadataInit("WrappingAnEnum", "tests.WrappingAnEnum",
+                ::bond::reflection::Attributes()
+            );
+        }
+    };
+    
 
     
 } // namespace tests

@@ -16,7 +16,7 @@
 #endif
 
 #include <bond/core/bond_types.h>
-//#include "bonded.h"
+#include "bond_fwd.h"
 #include "detail/metadata.h"
 #include <functional>
 
@@ -41,7 +41,7 @@ remove_maybe<maybe<T> >
 };
 
 
-static const uint16_t invalid_field_id = 0xffff;
+BOND_STATIC_CONSTEXPR uint16_t invalid_field_id = 0xffff;
 
 
 /** namespace bond::reflection */
@@ -54,22 +54,13 @@ typedef std::map<std::string, std::string> Attributes;
 
 
 // field is required
-struct required_field_modifier
-{
-    static const bond::Modifier value = bond::Modifier::Required;
-};
+using required_field_modifier = std::integral_constant<bond::Modifier, bond::Modifier::Required>;
 
 // field is optional
-struct optional_field_modifier
-{
-    static const bond::Modifier value = bond::Modifier::Optional;
-};
+using optional_field_modifier = std::integral_constant<bond::Modifier, bond::Modifier::Optional>;
 
 // field is required optional
-struct required_optional_field_modifier
-{
-    static const bond::Modifier value = bond::Modifier::RequiredOptional;
-};
+using required_optional_field_modifier = std::integral_constant<bond::Modifier, bond::Modifier::RequiredOptional>;
 
 
 /// @brief Field description in compile-time schema
@@ -109,20 +100,20 @@ struct FieldTemplate
     static const field_pointer field;
 
     /// @brief Static data member equal to the field ordinal
-    static const uint16_t id = field_id;
+    BOND_STATIC_CONSTEXPR uint16_t id = field_id;
 
     /// @brief Static method returning const reference to the field value for a particular object
     static
     const value_type& GetVariable(const struct_type& object)
     {
-        return object.*field;
+        return object.*field_ptr;
     }
 
     /// @brief Static method returning reference to the field value for a particular object
     static
     value_type& GetVariable(struct_type& object)
     {
-        return object.*field;
+        return object.*field_ptr;
     }
 
     BOOST_STATIC_ASSERT(field_id != invalid_field_id);
@@ -292,12 +283,12 @@ bond::Metadata MetadataInit(const nothing&, const char* name, bond::Modifier mod
 
 // Metadata initializer for structs
 inline
-bond::Metadata MetadataInit(const char* name, const char* qualified_name, const Attributes& attributes)
+bond::Metadata MetadataInit(const char* name, const char* qual_name, const Attributes& attributes)
 {
     bond::Metadata metadata;
 
     metadata.name = name;
-    metadata.qualified_name = qualified_name;
+    metadata.qualified_name = qual_name;
     metadata.attributes = attributes;
 
     return metadata;
@@ -307,9 +298,9 @@ bond::Metadata MetadataInit(const char* name, const char* qualified_name, const 
 // Metadata initializer for generic structs
 #if defined(BOND_NO_CXX11_VARIADIC_TEMPLATES)
 template <typename Params>
-bond::Metadata MetadataInit(const char* name, const char* qualified_name, const Attributes& attributes)
+bond::Metadata MetadataInit(const char* name, const char* qual_name, const Attributes& attributes)
 {
-    bond::Metadata metadata = MetadataInit(name, qualified_name, attributes);
+    bond::Metadata metadata = MetadataInit(name, qual_name, attributes);
 
     std::string params;
 
@@ -356,15 +347,12 @@ const reflection::nothing nothing = {};
 #ifdef BOND_NO_CXX11_VARIADIC_TEMPLATES
 template <typename T, typename Iter> struct
 field_id
-{
-    static const uint16_t value = boost::mpl::deref<Iter>::type::id;
-};
+    : std::integral_constant<uint16_t, boost::mpl::deref<Iter>::type::id> {};
 
 template <typename T> struct 
 field_id<T, typename boost::mpl::end<T>::type>
-{
-    static const uint16_t value = invalid_field_id;
-};
+    : std::integral_constant<uint16_t, invalid_field_id> {};
+
 
 template <typename T, uint16_t minId = 0> struct
 next_required_field
@@ -372,48 +360,46 @@ next_required_field
 private:
     template <typename Field> struct
     is_next_required
-    {
-        static const bool value = Field::id >= minId
-                               && is_same<typename Field::field_modifier, typename reflection::required_field_modifier>::value;
-    };
+        : std::integral_constant<bool,
+            Field::id >= minId
+            && std::is_same<typename Field::field_modifier, typename reflection::required_field_modifier>::value> {};
 
 public:
-
-    static const uint16_t value = field_id<t_Fields, typename boost::mpl::find_if<t_Fields, is_next_required<_> >::type>::value;
+    BOND_STATIC_CONSTEXPR uint16_t value = field_id<T, typename boost::mpl::find_if<T, is_next_required<_> >::type>::value;
 };
 
 #else
 
 namespace detail
 {
-    template<typename t_Schema, typename t_currentFieldIndex, uint16_t minId>
-    struct next_required_field_helper
-    {
-    private:
-        static const uint16_t currentFieldId = t_Schema::field<t_currentFieldIndex::value>::type::id;
-        static const bool currentFieldIsRequired = std::is_same<t_Schema::field<t_currentFieldIndex::value>::type::field_modifier, reflection::required_field_modifier>::value;
+	template<typename t_Schema, typename t_currentFieldIndex, uint16_t minId>
+	struct next_required_field_helper
+	{
+	private:
+		static const uint16_t currentFieldId = t_Schema::field<t_currentFieldIndex::value>::type::id;
+		static const bool currentFieldIsRequired = std::is_same<t_Schema::field<t_currentFieldIndex::value>::type::field_modifier, reflection::required_field_modifier>::value;
 
-    public:
-        static const uint16_t value = currentFieldId >= minId && currentFieldIsRequired ?
-            currentFieldId
-            : next_required_field_helper<t_Schema, std::integral_constant<size_t, t_currentFieldIndex::value + 1>, minId>::value;
-    };
+	public:
+		static const uint16_t value = currentFieldId >= minId && currentFieldIsRequired ?
+			currentFieldId
+			: next_required_field_helper<t_Schema, std::integral_constant<size_t, t_currentFieldIndex::value + 1>, minId>::value;
+	};
 
-    template<typename t_Schema, uint16_t minId>
-    struct next_required_field_helper<t_Schema, std::integral_constant<size_t, t_Schema::fieldCount>, minId>:
-        std::integral_constant<uint16_t, invalid_field_id>
-    {};
+	template<typename t_Schema, uint16_t minId>
+	struct next_required_field_helper<t_Schema, std::integral_constant<size_t, t_Schema::fieldCount>, minId> :
+		std::integral_constant<uint16_t, invalid_field_id>
+	{};
 }
 
 template<typename TField, uint16_t minId = 0>
 struct next_required_field
 {
 private:
-    typedef typename schema<typename TField::struct_type>::type t_Schema;
+	typedef typename schema<typename TField::struct_type>::type t_Schema;
 
 public:
 
-    static const uint16_t value = detail::next_required_field_helper<t_Schema, t_Schema::fieldIndex<TField>, minId>::value;
+	static const uint16_t value = detail::next_required_field_helper<t_Schema, t_Schema::fieldIndex<TField>, minId>::value;
 };
 
 #endif
@@ -488,12 +474,9 @@ remove_bonded<bonded<T> >
 
 template <typename T> struct
 is_bond_type
-{
-    typedef typename remove_const<T>::type U;
-
-    static const bool value = is_bonded<U>::value
-                           || has_schema<U>::value;
-};
+    : std::integral_constant<bool,
+        is_bonded<typename std::remove_const<T>::type>::value
+        || has_schema<typename std::remove_const<T>::type>::value> {};
 
 
 struct Unknown;
@@ -540,13 +523,10 @@ schema_for_passthrough<T, typename boost::disable_if<has_schema<typename remove_
 
 template <typename T> struct
 is_container
-{
-    typedef typename remove_const<T>::type U;
-
-    static const bool value = is_list_container<U>::value
-                           || is_set_container<U>::value
-                           || is_map_container<U>::value;
-};
+    : std::integral_constant<bool,
+        is_list_container<typename std::remove_const<T>::type>::value
+        || is_set_container<typename std::remove_const<T>::type>::value
+        || is_map_container<typename std::remove_const<T>::type>::value> {};
 
 
 template <typename Field, typename Transform, typename Enable = void> struct
@@ -577,14 +557,12 @@ is_matching_container
 
 template <typename T1, typename T2> struct
 is_matching_basic
-{
-    static const bool value =
-           (is_string<T1>::value && is_string<T2>::value)
+    : std::integral_constant<bool,
+        (is_string<T1>::value && is_string<T2>::value)
         || (is_wstring<T1>::value && is_wstring<T2>::value)
         || ((sizeof(T1) <= sizeof(T2))
-         && ((is_unsigned<T1>::value && is_unsigned<T2>::value)
-          || (is_signed_int_or_enum<T1>::value && is_signed_int_or_enum<T2>::value)));
-};
+            && ((is_unsigned<T1>::value && is_unsigned<T2>::value)
+                || (is_signed_int_or_enum<T1>::value && is_signed_int_or_enum<T2>::value)))> {};
 
 
 template <typename T> struct
@@ -594,12 +572,10 @@ is_matching_basic<typename aliased_type<T>::type, T>
 
 template <typename T1, typename T2> struct
 is_matching
-{
-    static const bool value =
-           (is_bond_type<T1>::value && is_bond_type<T2>::value)
+    : std::integral_constant<bool,
+        (is_bond_type<T1>::value && is_bond_type<T2>::value)
         || (is_matching_basic<T1, T2>::value)
-        || (is_matching_container<T1, T2>::value);
-};
+        || (is_matching_container<T1, T2>::value)> {};
 
 
 template <typename T> struct
@@ -627,7 +603,7 @@ is_matching_basic<float, double>
     : true_type {};
 
 
-template <typename T> struct
+template <typename T, typename Enable> struct
 get_type_id;
 
 
@@ -642,10 +618,9 @@ is_matching_container<T1, T2,
 // tuples match if the elements match
 template <typename T1, typename T2, typename U1, typename U2> struct
 is_matching<std::pair<T1, T2>, std::pair<U1, U2> >
-{
-    static const bool value = is_matching<T1, U1>::value
-                           && is_matching<T2, U2>::value;
-};
+    : std::integral_constant<bool,
+        is_matching<T1, U1>::value
+        && is_matching<T2, U2>::value> {};
 
 
 template <typename T1, typename T2> struct
@@ -677,10 +652,9 @@ is_element_matching<T, X, typename boost::enable_if<is_container<X> >::type>
 
 template <typename X, typename Reader> struct
 is_element_matching<value<void, Reader>, X, typename boost::enable_if<is_container<X> >::type>
-{
-    static const bool value = is_bond_type<typename element_type<X>::type>::value
-                           || is_container<typename element_type<X>::type>::value;
-};
+    : std::integral_constant<bool,
+        is_bond_type<typename element_type<X>::type>::value
+        || is_container<typename element_type<X>::type>::value> {};
 
 
 template <typename T, typename X, typename Enable = void> struct
@@ -695,10 +669,9 @@ is_map_element_matching<T, X, typename boost::enable_if<is_map_container<X> >::t
 
 template <typename X, typename Reader> struct
 is_map_element_matching<value<void, Reader>, X, typename boost::enable_if<is_map_container<X> >::type>
-{
-    static const bool value = is_bond_type<typename element_type<X>::type::second_type>::value
-                           || is_container<typename element_type<X>::type::second_type>::value;
-};
+    : std::integral_constant<bool,
+        is_bond_type<typename element_type<X>::type::second_type>::value
+        || is_container<typename element_type<X>::type::second_type>::value> {};
 
 
 template <typename T, typename X, typename Enable = void> struct
@@ -713,9 +686,8 @@ is_map_key_matching<T, X, typename boost::enable_if<is_map_container<X> >::type>
 
 template <typename T> struct
 is_basic_type
-{
-    static const bool value = !(is_container<T>::value || is_bond_type<T>::value);
-};
+    : std::integral_constant<bool,
+        !(is_container<T>::value || is_bond_type<T>::value)> {};
 
 template <> struct
 is_basic_type<void>
@@ -729,15 +701,14 @@ is_nested_container
 
 template <typename T> struct
 is_nested_container<T, typename boost::enable_if<is_map_container<T> >::type>
-{
-    static const bool value = !is_basic_type<typename element_type<T>::type::second_type>::value;
-};
+    : std::integral_constant<bool,
+        !is_basic_type<typename element_type<T>::type::second_type>::value> {};
+
 
 template <typename T> struct
 is_nested_container<T, typename boost::enable_if<is_list_container<T> >::type>
-{
-    static const bool value = !is_basic_type<typename element_type<T>::type>::value;
-};
+    : std::integral_constant<bool,
+        !is_basic_type<typename element_type<T>::type>::value> {};
 
 
 template <typename T, typename Enable = void> struct
@@ -746,18 +717,17 @@ is_struct_container
 
 template <typename T> struct
 is_struct_container<T, typename boost::enable_if<is_map_container<T> >::type>
-{
-    static const bool value = has_schema<typename element_type<T>::type::second_type>::value
-                           || is_struct_container<typename element_type<T>::type::second_type>::value;
-};
+    : std::integral_constant<bool,
+        has_schema<typename element_type<T>::type::second_type>::value
+        || is_struct_container<typename element_type<T>::type::second_type>::value> {};
+
 
 
 template <typename T> struct
 is_struct_container<T, typename boost::enable_if<is_list_container<T> >::type>
-{
-    static const bool value = has_schema<typename element_type<T>::type>::value
-                           || is_struct_container<typename element_type<T>::type>::value;
-};
+    : std::integral_constant<bool,
+        has_schema<typename element_type<T>::type>::value
+        || is_struct_container<typename element_type<T>::type>::value> {};
 
 
 // is_struct_container_field
@@ -940,36 +910,49 @@ get_type_id<void>
     : std::integral_constant<BondDataType, BondDataType::BT_UNAVAILABLE> {};
 
 template <typename T> struct
-get_type_id
-{
-    typedef typename remove_const<T>::type U;
-
-    static const BondDataType value =
-        is_enum<T>::value           ? get_type_id<int32_t>::value :
-        is_bond_type<T>::value      ? BondDataType::BT_STRUCT :
-        is_set_container<U>::value  ? BondDataType::BT_SET :
-        is_map_container<U>::value  ? BondDataType::BT_MAP :
-        is_list_container<U>::value ? BondDataType::BT_LIST :
-        is_string<U>::value         ? BondDataType::BT_STRING :
-        is_wstring<U>::value        ? BondDataType::BT_WSTRING :
-                                      get_type_id<typename aliased_type<T>::type>::value;
-};
-
-template <typename T>
-const BondDataType get_type_id<T>::value;
+get_type_id<T, typename boost::enable_if<std::is_enum<T>>::type>
+    : get_type_id<int32_t> {};
 
 template <typename T> struct
+get_type_id<T, typename boost::enable_if<is_bond_type<T>>::type>
+    : std::integral_constant<BondDataType, BondDataType::BT_STRUCT> {};
+
+template <typename T> struct
+get_type_id<T, typename boost::enable_if<is_set_container<typename std::remove_const<T>::type>>::type>
+    : std::integral_constant<BondDataType, BondDataType::BT_SET> {};
+
+template <typename T> struct
+get_type_id<T, typename boost::enable_if<is_map_container<typename std::remove_const<T>::type>>::type>
+    : std::integral_constant<BondDataType, BT_MAP> {};
+
+template <typename T> struct
+get_type_id<T, typename boost::enable_if<is_list_container<typename std::remove_const<T>::type>>::type>
+    : std::integral_constant<BondDataType, BT_LIST> {};
+
+template <typename T> struct
+get_type_id<T, typename boost::enable_if<is_string<typename std::remove_const<T>::type>>::type>
+    : std::integral_constant<BondDataType, BT_STRING> {};
+
+template <typename T> struct
+get_type_id<T, typename boost::enable_if<is_wstring<typename std::remove_const<T>::type>>::type>
+    : std::integral_constant<BondDataType, BT_WSTRING> {};
+
+template <typename T, typename Enable> struct
+get_type_id
+    : get_type_id<typename aliased_type<T>::type> {};
+
+
+template <typename T, typename Enable = void> struct
 get_list_sub_type_id
-{
-    typedef typename remove_const<T>::type U;
+    : std::integral_constant<ListSubType, ListSubType::NO_SUBTYPE> {};
 
-    static const ListSubType value =
-        is_nullable<U>::value       ? NULLABLE_SUBTYPE :
-        is_blob<U>::value           ? BLOB_SUBTYPE     :
-                                      NO_SUBTYPE;
-};
+template <typename T> struct
+get_list_sub_type_id<T, typename boost::enable_if<is_nullable<typename remove_const<T>::type> >::type>
+    : std::integral_constant<ListSubType, ListSubType::NULLABLE_SUBTYPE> {};
 
-template <typename T>
-const ListSubType get_list_sub_type_id<T>::value;
+template <typename T> struct
+get_list_sub_type_id<T, typename boost::enable_if<is_blob<typename remove_const<T>::type> >::type>
+    : std::integral_constant<ListSubType, ListSubType::BLOB_SUBTYPE> {};
+
 
 } // namespace bond

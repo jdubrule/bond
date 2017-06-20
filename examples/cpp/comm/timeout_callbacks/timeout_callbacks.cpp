@@ -35,7 +35,7 @@ class ServiceImpl : public Service
 int BOND_CALL main()
 {
     bond::comm::thread_pool threads;
-    bond::comm::SocketAddress loopback("127.0.0.1", 25188);
+    bond::comm::SocketAddress loopback("127.0.0.1", TEST_PORT_1);
     bond::comm::epoxy::EpoxyTransport transport;
 
     auto server = transport.Bind(loopback, boost::make_shared<ServiceImpl>());
@@ -57,7 +57,7 @@ int BOND_CALL main()
 
     // Expect an error
     assert(response.is_error());
-    assert(bond::comm::ErrorCode::TIMEOUT_ERROR == response.err().error_code());
+    assert(bond::comm::ErrorCode::TIMEOUT_ERROR == static_cast<bond::comm::ErrorCode>(response.err().error_code()));
 
     return 0;
 }

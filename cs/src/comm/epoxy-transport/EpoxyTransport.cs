@@ -8,7 +8,6 @@ namespace Bond.Comm.Epoxy
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
-    using Bond.Comm.Service;
 
     public class EpoxyTransportBuilder : TransportBuilder<EpoxyTransport>
     {
@@ -136,6 +135,9 @@ namespace Bond.Comm.Epoxy
         readonly Logger logger;
         readonly Metrics metrics;
 
+        readonly CleanupCollection<EpoxyConnection> connections;
+        readonly CleanupCollection<EpoxyListener> listeners;
+
         public struct Endpoint
         {
             public readonly string Host;
@@ -199,6 +201,9 @@ namespace Bond.Comm.Epoxy
             logger = new Logger(logSink, enableDebugLogs);
             // Metrics sink may be null
             metrics = new Metrics(metricsSink);
+
+            connections = new CleanupCollection<EpoxyConnection>();
+            listeners = new CleanupCollection<EpoxyListener>();
         }
 
         public override Error GetLayerStack(string uniqueId, out ILayerStack stack)
@@ -281,16 +286,37 @@ namespace Bond.Comm.Epoxy
         {
             logger.Site().Information("Connecting to {0}.", endpoint);
 
-            Socket socket = await ConnectClientSocketAsync(endpoint);
-
-            // For MakeClientStreamAsync, null TLS config means insecure
             EpoxyClientTlsConfig tlsConfig = endpoint.UseTls ? clientTlsConfig : null;
-            var epoxyStream = await EpoxyNetworkStream.MakeClientStreamAsync(endpoint.Host, socket, tlsConfig, logger);
 
-            // TODO: keep these in some master collection for shutdown
-            var connection = EpoxyConnection.MakeClientConnection(this, epoxyStream, logger, metrics);
-            await connection.StartAsync();
-            return connection;
+            try
+            {
+                EpoxyNetworkStream epoxyStream =
+                    await EpoxyNetworkStream.MakeAsync(
+                        socketFunc: () => ConnectClientSocketAsync(endpoint),
+                        streamFunc: socket => EpoxyNetworkStream.MakeClientStreamAsync(endpoint.Host, socket, tlsConfig, logger),
+                        timeoutConfig: timeoutConfig,
+                        logger: logger);
+
+                var connection = EpoxyConnection.MakeClientConnection(this, epoxyStream, logger, metrics);
+
+                try
+                {
+                    connections.Add(connection);
+                }
+                catch (InvalidOperationException)
+                {
+                    await connection.StopAsync();
+                    throw new InvalidOperationException("This EpoxyTransport has been stopped already.");
+                }
+
+                await connection.StartAsync();
+                return connection;
+            }
+            catch (Exception ex)
+            {
+                logger.Site().Error(ex, "Failed to start Epoxy client connection to '{0}'", endpoint);
+                throw;
+            }
         }
 
         public Task<EpoxyConnection> ConnectToAsync(Endpoint endpoint)
@@ -305,12 +331,37 @@ namespace Bond.Comm.Epoxy
 
         public EpoxyListener MakeListener(IPEndPoint address)
         {
-            return new EpoxyListener(this, address, serverTlsConfig, timeoutConfig, logger, metrics);
+            var listener = new EpoxyListener(this, address, serverTlsConfig, timeoutConfig, logger, metrics);
+
+            try
+            {
+                listeners.Add(listener);
+            }
+            catch (InvalidOperationException)
+            {
+                throw new InvalidOperationException("This EpoxyTransport has been stopped already.");
+            }
+
+            return listener;
         }
 
         public override Task StopAsync()
         {
-            return TaskExt.CompletedTask;
+            Func<EpoxyConnection, Task> cleanupConnectionFunc = connection =>
+            {
+                logger.Site().Debug("Stopping connection {0}", connection);
+                return connection.StopAsync();
+            };
+
+            Func<EpoxyListener, Task> cleanupListenerFunc = listener =>
+            {
+                logger.Site().Debug("Stopping listener {0}", listener);
+                return listener.StopAsync();
+            };
+
+            return Task.WhenAll(
+                connections.CleanupAsync(cleanupConnectionFunc),
+                listeners.CleanupAsync(cleanupListenerFunc));
         }
 
         public static IPEndPoint ParseStringAddress(string address)
@@ -396,60 +447,17 @@ namespace Bond.Comm.Epoxy
             logger.Site().Debug("Resolved {0} to {1}.", endpoint.Host, ipAddress);
 
             var socket = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            ConfigureSocketKeepAlive(socket, timeoutConfig, logger);
-            await Task.Factory.FromAsync(socket.BeginConnect, socket.EndConnect, ipAddress, endpoint.Port, state: null);
+            await Task.Factory.FromAsync(
+                socket.BeginConnect,
+                socket.EndConnect,
+                ipAddress,
+                endpoint.Port,
+                state: null);
 
-            logger.Site().Information("Established TCP connection to {0} at {1}:{2}", endpoint.Host, ipAddress, endpoint.Port);
+            logger.Site().Information(
+                "Established TCP connection to {0} at {1}:{2}",
+                endpoint.Host, ipAddress, endpoint.Port);
             return socket;
-        }
-
-        internal static void ConfigureSocketKeepAlive(Socket socket, TimeoutConfig timeoutConfig, Logger logger)
-        {
-            if (timeoutConfig.KeepAliveTime != TimeSpan.Zero && timeoutConfig.KeepAliveInterval != TimeSpan.Zero)
-            {
-                // Socket.IOControl for IOControlCode.KeepAliveValues is expecting a structure like
-                // the following on Windows:
-                //
-                // struct tcp_keepalive
-                // {
-                //     u_long onoff; // 0 for off, non-zero for on
-                //     u_long keepalivetime; // milliseconds
-                //     u_long keepaliveinterval; // milliseconds
-                // };
-                //
-                // On some platforms this gets mapped to the relevant OS structures, but on other
-                // platforms, this may fail with a PlatformNotSupportedException.
-                UInt32 keepAliveTimeMillis = checked((UInt32) timeoutConfig.KeepAliveTime.TotalMilliseconds);
-                UInt32 keepAliveIntervalMillis = checked((UInt32) timeoutConfig.KeepAliveInterval.TotalMilliseconds);
-
-                var keepAliveVals = new byte[sizeof (UInt32)*3];
-                keepAliveVals[0] = 1;
-
-                keepAliveVals[4] = (byte) (keepAliveTimeMillis & 0xff);
-                keepAliveVals[5] = (byte) ((keepAliveTimeMillis >> 8) & 0xff);
-                keepAliveVals[6] = (byte) ((keepAliveTimeMillis >> 16) & 0xff);
-                keepAliveVals[7] = (byte) ((keepAliveTimeMillis >> 24) & 0xff);
-
-                keepAliveVals[8] = (byte) (keepAliveIntervalMillis & 0xff);
-                keepAliveVals[9] = (byte) ((keepAliveIntervalMillis >> 8) & 0xff);
-                keepAliveVals[10] = (byte) ((keepAliveIntervalMillis >> 16) & 0xff);
-                keepAliveVals[11] = (byte) ((keepAliveIntervalMillis >> 24) & 0xff);
-
-                try
-                {
-                    socket.IOControl(IOControlCode.KeepAliveValues, keepAliveVals, null);
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Oh well: the connection went down before we could configure it. Nothing to be
-                    // done, except to wait for the next socket operation to fail and let normal
-                    // clean up take over.
-                }
-                catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException)
-                {
-                    logger.Site().Warning(ex, "Socket keep-alive could not be configured");
-                }
-            }
         }
     }
 }

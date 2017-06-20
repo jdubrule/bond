@@ -11,9 +11,9 @@ namespace Bond
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Text;
-    using Bond.Reflection;
+    using Bond.Internal.Reflection;
 
-    public static class BondReflection
+    public static class Reflection
     {
         static readonly object Empty = new object();
         static readonly Dictionary<BondDataType, string> bondTypeName = new Dictionary<BondDataType, string>

@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #pragma once
-#include <bond/core/reflection.h>
+#include <bond/core/protocol.h>
 
 namespace bond
 {
@@ -257,10 +257,8 @@ StructEnd(Input& /*input*/, bool /*base*/)
 // and for untagged protocols which implement field omitting support.
 template <typename T> struct 
 may_omit_fields
-{
-    static const bool value = !uses_static_parser<typename T::Reader>::value
-                           || detail::implements_field_omitting<T>::value;
-};
-
+    : std::integral_constant<bool,
+        !uses_static_parser<typename T::Reader>::value
+        || detail::implements_field_omitting<T>::value> {};
 
 } // namespace bond

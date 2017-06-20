@@ -33,7 +33,7 @@ class ServiceImpl : public Service
 
 int BOND_CALL main()
 {
-    bond::comm::SocketAddress loopback("127.0.0.1", 25188);
+    bond::comm::SocketAddress loopback("127.0.0.1", TEST_PORT_1);
     bond::comm::epoxy::EpoxyTransport transport;
 
     auto server = transport.Bind(loopback, boost::make_shared<ServiceImpl>());
@@ -64,7 +64,7 @@ int BOND_CALL main()
     {
         boost::ignore_unused(ex);
         // Expect InvalidInvocation when trying to access error payload.
-        assert(bond::comm::ErrorCode::INVALID_INVOCATION == ex.error_code);
+        assert(bond::comm::ErrorCode::INVALID_INVOCATION == static_cast<bond::comm::ErrorCode>(ex.error_code));
     }
 
     return 0;

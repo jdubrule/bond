@@ -11,6 +11,8 @@
 #include <bond/stream/output_counter.h>
 #include <boost/call_traits.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/static_assert.hpp>
+#include <cstring>
 
 /*
 
@@ -86,9 +88,12 @@
                      string, wstring        | count | characters |
                                             '-------'------------'
 
-                           count            variable encoded uint32 count of 1-byte or 2-byte characters
+                           count            variable encoded uint32 count of 1-byte (for
+                                            string) or 2-byte (for wstring) Unicode code
+                                            units
 
-                           characters       1-byte or 2-byte characters
+                           characters       1-byte UTF-8 code units (for string) or 2-byte
+                                            UTF-16LE code units (for wstring)
 
 
                                             .-------.-------.-------.
@@ -145,14 +150,14 @@ public:
     typedef DynamicParser<CompactBinaryReader&> Parser;
     typedef CompactBinaryWriter<Buffer>         Writer;
 
-    static const uint16_t magic; // = COMPACT_PROTOCOL
-    static const uint16_t version = v2;
+    BOND_STATIC_CONSTEXPR uint16_t magic = COMPACT_PROTOCOL;
+    BOND_STATIC_CONSTEXPR uint16_t version = v2;
 
     /// @brief Construct from input buffer/stream containing serialized data.
     CompactBinaryReader(typename boost::call_traits<Buffer>::param_type input,
-                        uint16_t version = default_version<CompactBinaryReader>::value)
+                        uint16_t version_value = default_version<CompactBinaryReader>::value)
         : _input(input),
-          _version(version)
+          _version(version_value)
     {
         BOOST_ASSERT(protocol_has_multiple_versions<CompactBinaryReader>::value
             ? _version <= CompactBinaryReader::version
@@ -177,7 +182,7 @@ public:
     }
 
 
-    /// @brief Access to underlaying buffer
+    /// @brief Access to underlying buffer
     typename boost::call_traits<Buffer>::const_reference
     GetBuffer() const
     {
@@ -185,14 +190,22 @@ public:
     }
 
 
+    /// @brief Access to underlying buffer
+    typename boost::call_traits<Buffer>::reference
+    GetBuffer()
+    {
+        return _input;
+    }
+
+
     bool ReadVersion()
     {
-        uint16_t magic;
+        uint16_t magic_value;
 
-        _input.Read(magic);
+        _input.Read(magic_value);
         _input.Read(_version);
 
-        return magic == CompactBinaryReader::magic
+        return magic_value == CompactBinaryReader::magic
             && (protocol_has_multiple_versions<CompactBinaryReader>::value
                 ? _version <= CompactBinaryReader::version
                 : _version == default_version<CompactBinaryReader>::value);
@@ -225,14 +238,18 @@ public:
 
         if (id == (0x07 << 5))
         {
+            // ID is in (0xff, 0xffff] and is in the next two bytes
             _input.Read(id);
         }
         else if (id == (0x06 << 5))
         {
-            _input.Read(reinterpret_cast<uint8_t&>(id));
+            // ID is in (5, 0xff] and is in the next one byte
+            _input.Read(raw);
+            id = static_cast<uint16_t>(raw);
         }
         else
         {
+            // ID is in [0, 5] and was in the byte we already read
             id >>= 5;
         }
     }
@@ -311,7 +328,9 @@ public:
     Read(T& value)
     {
         BOOST_STATIC_ASSERT(sizeof(value) == sizeof(int32_t));
-        Read(*reinterpret_cast<int32_t*>(&value));
+        int32_t raw;
+        Read(raw);
+        std::memcpy(&value, &raw, sizeof(raw));
     }
 
 
@@ -495,10 +514,18 @@ protected:
                                   const CompactBinaryWriter<Output>&);
 };
 
-template <typename Buffer>
-const uint16_t CompactBinaryReader<Buffer>::magic = static_cast<uint16_t>(ProtocolType::COMPACT_PROTOCOL);
+template <typename BufferT>
+BOND_CONSTEXPR_OR_CONST uint16_t CompactBinaryReader<BufferT>::magic;
 
-class OutputCounter;
+class CompactBinaryCounter
+{
+    template <typename Buffer>
+    friend class CompactBinaryWriter;
+
+private:
+    struct type : OutputCounter // Must be a new type and not an alias.
+    {};
+};
 
 
 /// @brief Writer for Compact Binary Protocol
@@ -520,10 +547,12 @@ class CompactBinaryWriter
         CompactBinaryWriter* writer;
     };
 
+    using Counter = CompactBinaryCounter::type;
+
 public:
-    typedef BufferT                             Buffer;
-    typedef CompactBinaryReader<Buffer>         Reader;
-    typedef CompactBinaryWriter<OutputCounter>  Pass0;
+    typedef BufferT                         Buffer;
+    typedef CompactBinaryReader<Buffer>     Reader;
+    typedef CompactBinaryWriter<Counter>    Pass0;
 
 
     /// @brief Construct from output buffer/stream.
@@ -539,11 +568,19 @@ public:
     }
 
     template<typename T>
-    CompactBinaryWriter(OutputCounter& output,
+    CompactBinaryWriter(Counter& output,
                         const CompactBinaryWriter<T>& pass1)
         : _output(output),
           _version(pass1._version)
     {}
+
+
+    /// @brief Access to underlying buffer
+    typename boost::call_traits<Buffer>::reference
+    GetBuffer()
+    {
+        return _output;
+    }
 
 
     bool NeedPass0()
@@ -727,13 +764,13 @@ protected:
     template <typename Buffer>
     friend class CompactBinaryWriter;
 
-    void LengthBegin(OutputCounter& counter)
+    void LengthBegin(Counter& counter)
     {
         _stack.push(_lengths.size());
         _lengths.push(counter.GetCount());
     }
 
-    void LengthEnd(OutputCounter& counter)
+    void LengthEnd(Counter& counter)
     {
         uint32_t& length = _lengths[_stack.pop()];
 
