@@ -245,9 +245,9 @@ bool TranscodeFrom(Reader reader, const Options& options)
 template <typename Input>
 bool Transcode(Input input, const Options& options)
 {
-    bf::Protocol from = options.from.empty() ? guess : options.from.front();
+    bf::Protocol from = options.from.empty() ? Protocol::guess : options.from.front();
 
-    if (from == guess)
+    if (from == Protocol::guess)
     {
         from = Guess(input);
         std::cerr << std::endl << "Guessed " << ToString(from) << std::endl;

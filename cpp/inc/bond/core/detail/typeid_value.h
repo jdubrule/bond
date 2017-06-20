@@ -337,16 +337,16 @@ inline MatchingTypeContainer(T& var, BondDataType type, Reader& input, uint32_t 
     switch (type)
     {
         case bond::BondDataType::BT_INT8:
-            return DeserializeElements<Protocols>(var, value<int8_t, Reader&>(input, false), size);
+            return DeserializeElements(var, value<int8_t, Reader&>(input, false), size);
 
         case bond::BondDataType::BT_INT16:
-            return DeserializeElements<Protocols>(var, value<int16_t, Reader&>(input, false), size);
+            return DeserializeElements(var, value<int16_t, Reader&>(input, false), size);
 
         case bond::BondDataType::BT_INT32:
-            return DeserializeElements<Protocols>(var, value<int32_t, Reader&>(input, false), size);
+            return DeserializeElements(var, value<int32_t, Reader&>(input, false), size);
 
         case bond::BondDataType::BT_INT64:
-            return DeserializeElements<Protocols>(var, value<int64_t, Reader&>(input, false), size);
+            return DeserializeElements(var, value<int64_t, Reader&>(input, false), size);
 
         default:
             BOOST_ASSERT(!IsMatching<typename element_type<T>::type>(type));
