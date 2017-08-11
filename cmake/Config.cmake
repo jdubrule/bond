@@ -54,21 +54,21 @@ if (WIN32)
 
     # If C# has been built we will also run C# compatibility tests
     find_program (BOND_CSHARP_COMPAT_TEST Bond.CompatibilityTest.exe
-        PATH_SUFFIXES net40 net45
+        PATH_SUFFIXES net45
         NO_DEFAULT_PATH
         PATHS
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/core/bin/debug"
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/core/bin/retail")
 
     find_program (BOND_CSHARP_COMM_COMPAT_SERVER CommCompatServer.exe
-        PATH_SUFFIXES net40 net45
+        PATH_SUFFIXES net45
         NO_DEFAULT_PATH
         PATHS
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/comm/server/bin/debug"
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/comm/server/bin/retail")
 
     find_program (BOND_CSHARP_COMM_COMPAT_CLIENT CommCompatClient.exe
-        PATH_SUFFIXES net40 net45
+        PATH_SUFFIXES net45
         NO_DEFAULT_PATH
         PATHS
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/comm/client/bin/debug"
@@ -179,7 +179,7 @@ set (BOND_LIBRARIES_INSTALL_CPP
     CACHE BOOL "If TRUE, the generated .cpp files for the Bond libraries will be installed under src/ as part of the INSTALL target.")
 
 set (BOND_ENABLE_COMM
-    "TRUE"
+    "FALSE"
     CACHE BOOL "If FALSE, then do not build Comm")
 
 set (BOND_SKIP_GBC_TESTS

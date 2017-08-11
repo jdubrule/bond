@@ -1,9 +1,10 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup>
-    <BuildFramework Condition="'$(Configuration)' == 'Net40'">net40</BuildFramework>
-  </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath32)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath32)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup Condition="'$(BuildNonportable)' == 'true'">
+    <BuildFramework>net45-nonportable</BuildFramework>
+    <DefineConstants>$(DefineConstants);SUPPORTS_BIGINTEGER</DefineConstants>
+  </PropertyGroup>
   <Import Project="$(MSBuildThisFileDirectory)\..\..\build\internal\Common.Internal.props" />
   <PropertyGroup>
     <ProjectGuid>{FF056B62-225A-47BC-B177-550FADDA4B41}</ProjectGuid>
@@ -14,13 +15,13 @@
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <IsCodedUITest>False</IsCodedUITest>
     <TestProjectType>UnitTest</TestProjectType>
-    <DependentOutputPath>$(OutputPath)</DependentOutputPath>
+    <OrigOutputPath>$(OutputPath)</OrigOutputPath>
+    <DependentOutputPath>bin\$(BuildType)\net45</DependentOutputPath>
+    <HasNonportableVersion>true</HasNonportableVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <IntermediateOutputPath>$(IntermediateOutputPath)\Properties\</IntermediateOutputPath>
     <OutputPath>$(OutputPath)\Properties\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)' == 'Net40' ">
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Fields' ">
     <IntermediateOutputPath>$(IntermediateOutputPath)\Fields\</IntermediateOutputPath>
@@ -39,25 +40,26 @@
     <Compile Include="DeserializerControlsTests.cs" />
     <Compile Include="EnumString.cs" />
     <Compile Include="Equal.cs" />
+    <Compile Include="GenericsTests.cs" />
     <Compile Include="GuidConversionTests.cs" />
     <Compile Include="InterfaceTests.cs" />
     <Compile Include="JsonParsingTests.cs" />
+    <Compile Include="JsonSerializationTests.cs" />
     <Compile Include="MetaInitializationTests.cs" />
     <Compile Include="Partial.cs" />
     <Compile Include="properties\AssemblyInfo.cs" />
+    <Compile Include="ProtocolTests.cs" />
     <Compile Include="Random.cs" />
     <Compile Include="SerializationTests.cs" />
     <Compile Include="SerializerGeneratorFactoryTests.cs" />
-    <Compile Include="GenericsTests.cs" />
     <Compile Include="StreamTests.cs" />
     <Compile Include="Structs.cs" />
     <Compile Include="TypeAliasTests.cs" />
-    <Compile Include="ProtocolTests.cs" />
     <Compile Include="Util.cs" />
-    <Compile Include="XmlTests.cs" />
+    <Compile Include="XmlParsingTests.cs" />
+    <Compile Include="XmlSerializationTests.cs" />
     <BondCodegen Include="Aliases.bond">
-      <Options Condition="'$(TargetFrameworkVersion)' == 'v4.5'">$(BondOptions) --using="Lazy=Lazy&lt;{0}&gt;" --using="OrderedSet=SortedSet&lt;{0}&gt;" --using="Decimal=decimal" --using="EnumString=Alias.EnumString&lt;{0}&gt;" --using="Array={0}[]" --using=ArrayBlob=byte[] --using="CustomList=UnitTest.Aliases.SomeCustomList&lt;{0}&gt;"</Options>
-      <Options Condition="'$(TargetFrameworkVersion)' == 'v4.0'">$(BondOptions) --using="Lazy=Lazy&lt;{0}&gt;" --using="OrderedSet=SortedSet&lt;{0}&gt;" --using="Decimal=decimal" --using="EnumString=Alias.EnumString&lt;{0}&gt;" --using="Array={0}[]" --using=ArrayBlob=byte[] --using="CustomList=UnitTest.Aliases.SomeCustomList&lt;{0}&gt;"</Options>
+      <Options>$(BondOptions) --using="Lazy=Lazy&lt;{0}&gt;" --using="OrderedSet=SortedSet&lt;{0}&gt;" --using="Decimal=decimal" --using="EnumString=Alias.EnumString&lt;{0}&gt;" --using="Array={0}[]" --using=ArrayBlob=byte[] --using="CustomList=UnitTest.Aliases.SomeCustomList&lt;{0}&gt;"</Options>
     </BondCodegen>
     <BondCodegen Include="NamespaceConflict.bond" />
     <BondCodegen Include="NamespaceConflictBond.bond" />
@@ -74,13 +76,13 @@
     </BondCodegen>
     <BondCodegen Include="import dir with spaces\Bond File With Spaces.bond" />
     <!-- Resharper Workaround -->
-    <Compile Include="$(IntermediateOutputPath)\UnitTest_types.cs" Condition="False" />
-    <Compile Include="$(IntermediateOutputPath)\Containers_types.cs" Condition="False" />
     <Compile Include="$(IntermediateOutputPath)\Aliases_types.cs" Condition="False" />
-    <Compile Include="$(IntermediateOutputPath)\ReadOnly_types.cs" Condition="False" />
+    <Compile Include="$(IntermediateOutputPath)\Bond File With Spaces_types.cs" Condition="False" />
+    <Compile Include="$(IntermediateOutputPath)\Containers_types.cs" Condition="False" />
     <Compile Include="$(IntermediateOutputPath)\NamespaceConflict_types.cs" Condition="False" />
     <Compile Include="$(IntermediateOutputPath)\NamespaceConflictBond_types.cs" Condition="False" />
-    <Compile Include="$(IntermediateOutputPath)\Bond File With Spaces_types.cs" Condition="False" />
+    <Compile Include="$(IntermediateOutputPath)\ReadOnly_types.cs" Condition="False" />
+    <Compile Include="$(IntermediateOutputPath)\UnitTest_types.cs" Condition="False" />
     <!-- End Resharper Workaround -->
   </ItemGroup>
   <ItemGroup>
@@ -90,11 +92,11 @@
     <Reference Include="nunit.framework">
       <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
     </Reference>
-    <Reference Include="Newtonsoft.Json" Condition="'$(TargetFrameworkVersion)' == 'v4.5'">
+    <Reference Include="Newtonsoft.Json" Condition="'$(BuildFramework)' == 'net45'">
       <HintPath>..\..\packages\Newtonsoft.Json.9.0.1\lib\portable-net45+wp80+win8+wpa81\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="Newtonsoft.Json" Condition="'$(TargetFrameworkVersion)' == 'v4.0'">
-      <HintPath>..\..\packages\Newtonsoft.Json.9.0.1\lib\portable-net40+sl5+wp80+win8+wpa81\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="Newtonsoft.Json" Condition="'$(BuildFramework)' == 'net45-nonportable'">
+      <HintPath>..\..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -111,7 +113,7 @@
       <HintPath>..\..\src\io\$(DependentOutputPath)\Bond.IO.dll</HintPath>
     </Reference>
     <Reference Include="Bond.JSON">
-      <HintPath>..\..\src\json\$(DependentOutputPath)\Bond.JSON.dll</HintPath>
+      <HintPath>..\..\src\json\$(OrigOutputPath)\Bond.JSON.dll</HintPath> <!-- Intentionally not DependentOutputPath to match BuildFramework-->
     </Reference>
   </ItemGroup>
   <ItemGroup>
