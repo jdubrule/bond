@@ -7,26 +7,28 @@ module IO
     , parseASTFile
     , parseNamespaceMappings
     , parseAliasMappings
+    , slashNormalize
     )
     where
 
+import Control.Applicative
+import Control.Monad.Loops (firstM)
+import Data.Aeson (eitherDecode)
+import Data.Void (Void)
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Text as T
+import Language.Bond.Codegen.TypeMapping
+import Language.Bond.Parser
+import Language.Bond.Syntax.JSON()
+import Language.Bond.Syntax.Types (Bond(..))
+import Prelude
+import System.Directory
 import System.Exit
 import System.FilePath
-import System.Directory
 import System.IO
-import Control.Applicative
-import Prelude
-import Data.Aeson (eitherDecode)
-import Data.Text
-import Control.Monad.Loops (firstM)
-import qualified Data.ByteString.Lazy as BL
-import Text.Parsec
-import Text.ParserCombinators.Parsec.Error
+import Text.Megaparsec
 import Text.Printf
-import Language.Bond.Syntax.Types (Bond(..))
-import Language.Bond.Syntax.JSON()
-import Language.Bond.Parser
-import Language.Bond.Codegen.TypeMapping
 
 
 parseFile :: [FilePath] -> FilePath -> IO(Bond)
@@ -53,9 +55,10 @@ parseBondFile importDirs file = do
             Just path' -> do
                 content <- readFileUtf8 path'
                 return (path', content)
-            Nothing -> fail $ "Can't find import file " ++ importFile
+            Nothing -> fail $ "Can't find import file " ++ importFile'
       where
-        findFilePath dirs = fmap (</> importFile) <$> firstM (doesFileExist . (</> importFile)) dirs
+        importFile' = slashNormalize importFile
+        findFilePath dirs = fmap (</> importFile') <$> firstM (doesFileExist . (</> importFile')) dirs
 
     readFileUtf8 name = do
         h <- openFile name ReadMode
@@ -86,21 +89,30 @@ parseNamespaceMappings = mapM $
         Left err -> fail $ show err
         Right m -> return m
 
-msbuildErrorMessage :: ParseError -> String
+msbuildErrorMessage :: (ParseError Char Void) -> String
 msbuildErrorMessage err = printf "%s(%d,%d) : error B0000: %s" name line col message
     where
         message = combinedMessage err
         pos = errorPos err
-        name = sourceName pos
-        line = sourceLine pos
-        col = sourceColumn pos
+        name = sourceName (NE.head pos)
+        line = unPos $ sourceLine (NE.head pos)
+        col = unPos $ sourceColumn (NE.head pos)
 
-combinedMessage :: ParseError -> String
-combinedMessage err = id $ unpack $ intercalate (pack ", ") messages
+combinedMessage :: (ParseError Char Void) -> String
+combinedMessage err = id $ T.unpack $ T.intercalate (T.pack ", ") messages
     where
-        -- showErrorMessages returns a multi-line String starting with a blank
-        -- line. We need to break it up to make a useful one-line message.
-        messages = splitOn (pack "\n") $ strip $ pack $
-            showErrorMessages "or" "unknown parse error"
-                "expecting" "unexpected" "end of input"
-                (errorMessages err)
+        -- parseErrorPretty returns a multi-line String.
+        -- We need to break it up to make a useful one-line message.
+        messages = T.splitOn (T.pack "\n") $ T.strip $ T.pack $ parseErrorTextPretty err
+
+-- | Normalizes a file path to only use the current platform's preferred
+-- directory separator.
+--
+-- Bond doesn't support files or directories with backslashes in their
+-- names, so backslashes are always converted to the platform's preferred
+-- separator.
+slashNormalize :: FilePath -> FilePath
+slashNormalize path = map replace path
+  where replace '/'  = pathSeparator
+        replace '\\' = pathSeparator
+        replace c    = c

@@ -12,9 +12,33 @@ function (add_stack_build target)
     set (flagArgs ENABLE_TESTS)
     set (multiValueArgs SOURCES DEPENDS)
     cmake_parse_arguments (arg "${flagArgs}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
     if (${arg_ENABLE_TESTS})
         set (options "--test")
     endif()
+
+    # If unspecified, turn off optimizations
+    list (APPEND options $<$<CONFIG:>:--fast>)
+
+    list (APPEND options $<$<CONFIG:Debug>:--fast>)
+    list (APPEND options $<$<CONFIG:Debug>:--no-executable-stripping>)
+    list (APPEND options $<$<CONFIG:Debug>:--no-library-stripping>)
+    list (APPEND options $<$<CONFIG:Debug>:--no-strip>)
+
+    list (APPEND options $<$<CONFIG:MinSizeRel>:--executable-stripping>)
+    list (APPEND options $<$<CONFIG:MinSizeRel>:--ghc-options=-O2>)
+    list (APPEND options $<$<CONFIG:MinSizeRel>:--library-stripping>)
+    list (APPEND options $<$<CONFIG:MinSizeRel>:--split-objs>)
+
+    list (APPEND options $<$<CONFIG:Release>:--executable-stripping>)
+    list (APPEND options $<$<CONFIG:Release>:--ghc-options=-O2>)
+    list (APPEND options $<$<CONFIG:Release>:--library-stripping>)
+
+    list (APPEND options $<$<CONFIG:RelWithDebInfo>:--ghc-options=-O2>)
+    list (APPEND options $<$<CONFIG:RelWithDebInfo>:--no-executable-stripping>)
+    list (APPEND options $<$<CONFIG:RelWithDebInfo>:--no-library-stripping>)
+    list (APPEND options $<$<CONFIG:RelWithDebInfo>:--no-strip>)
+
     add_custom_command (
         DEPENDS ${arg_SOURCES}
         COMMAND ${CMAKE_COMMAND}
@@ -22,7 +46,7 @@ function (add_stack_build target)
             -N
             -Dbuild_dir=${CMAKE_CURRENT_BINARY_DIR}
             -Dtarget=${target}
-            -Dstack_options=${options}
+            "\"-Dstack_options=${options}\""
             -P stack_build.cmake
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/build/${target}/${target}${CMAKE_EXECUTABLE_SUFFIX})
@@ -57,6 +81,9 @@ source_group ("Language\\Bond\\Codegen\\Cpp" FILES ${language_bond_codegen_cpp})
 file (GLOB language_bond_codegen_cs "src/Language/Bond/Codegen/Cs/*.hs")
 source_group ("Language\\Bond\\Codegen\\Cs" FILES ${language_bond_codegen_cs})
 
+file (GLOB language_bond_codegen_java "src/Language/Bond/Codegen/Java/*.hs")
+source_group ("Language\\Bond\\Codegen\\Java" FILES ${language_bond_codegen_java})
+
 set (sources
     bond.cabal
     stack.yaml
@@ -67,7 +94,8 @@ set (sources
     ${language_bond_syntax}
     ${language_bond_codegen}
     ${language_bond_codegen_cpp}
-    ${language_bond_codegen_cs})
+    ${language_bond_codegen_cs}
+    ${language_bond_codegen_java})
 
 file (GLOB tests "tests/Tests/*.hs")
 source_group ("Tests" FILES ${tests})
@@ -76,7 +104,7 @@ set (test_sources
     tests/TestMain.hs
     ${tests})
 
-set (completion_dir /etc/bash_completion.d)
+set (completion_dir etc/bash_completion.d)
 set (completion ${CMAKE_CURRENT_BINARY_DIR}/gbc.comp)
 set (output ${CMAKE_CURRENT_BINARY_DIR}/build/gbc/gbc${CMAKE_EXECUTABLE_SUFFIX})
 set (GBC_EXECUTABLE ${output} PARENT_SCOPE)
@@ -100,8 +128,6 @@ install (FILES ${output}
     PERMISSIONS OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE
     DESTINATION bin)
 
-if(EXISTS "${completion_dir}" AND IS_DIRECTORY "${completion_dir}")
-    install (FILES ${completion}
-        RENAME gbc
-        DESTINATION ${completion_dir})
-endif()
+install (FILES ${completion}
+         RENAME gbc
+         DESTINATION ${completion_dir})

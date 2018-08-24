@@ -36,48 +36,98 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
+#include "detail/service.h"
+#include "exception.h"
+#include "io_manager.h"
+
+#include <bond/ext/grpc/service_collection.h>
+
 #ifdef _MSC_VER
     #pragma warning (push)
     #pragma warning (disable: 4100 4702)
 #endif
 
-#include <grpc++/grpc++.h>
+#include <grpcpp/grpcpp.h>
 
 #ifdef _MSC_VER
     #pragma warning (pop)
 #endif
 
-#include <bond/ext/grpc/io_manager.h>
-#include <bond/ext/grpc/thread_pool.h>
-
 #include <boost/assert.hpp>
-#include <boost/optional/optional.hpp>
+#include <boost/range/combine.hpp>
+
 #include <memory>
+#include <string>
 #include <thread>
+#include <vector>
 
-namespace bond { namespace ext { namespace gRPC {
-
-    template <typename TThreadPool> class server_builder_core;
-
-    /// @brief Models a gRPC server powered by Bond services.
+namespace bond { namespace ext { namespace grpc
+{
+    /// @brief Models a grpc server powered by Bond services.
     ///
-    /// Servers are configured and started via
-    /// bond::ext:gRPC::server_builder.
-    template <typename TThreadPool>
-    class server_core final
+    /// Servers are configured and started via bond::ext:grpc::server::Start.
+    class server final
     {
     public:
-        ~server_core()
+        /// @brief Builds and returns a running server which is ready to process calls
+        /// for the provided services.
+        template <typename... Services>
+        static server Start(::grpc::ServerBuilder& builder, std::unique_ptr<Services>... services)
         {
-            Shutdown();
-            Wait();
+            service_collection all;
+            all.Add(std::move(services)...);
+            return Start(builder, std::move(all));
         }
 
-        server_core(const server_core&) = delete;
-        server_core& operator=(const server_core&) = delete;
+        /// @brief Builds and returns a running server which is ready to process calls
+        /// for the provided services.
+        static server Start(::grpc::ServerBuilder& builder, service_collection services)
+        {
+            auto cq = builder.AddCompletionQueue();
 
-        server_core(server_core&&) = default;
-        server_core& operator=(server_core&&) = default;
+            for (const auto& item : boost::combine(services.services(), services.names()))
+            {
+                auto& service = item.get<0>();
+
+                if (const auto& host = item.get<1>())
+                {
+                    builder.RegisterService(host.value(), service->grpc_service());
+                }
+                else
+                {
+                    builder.RegisterService(service->grpc_service());
+                }
+
+                service->SetCompletionQueue(cq.get());
+            }
+
+            if (auto svr = builder.BuildAndStart())
+            {
+                return server{
+                    std::move(svr),
+                    std::move(services.services()),
+                    std::unique_ptr<io_manager>{ new io_manager{
+                        std::thread::hardware_concurrency(), /*delay=*/ false, std::move(cq) } } };
+            }
+
+            throw ServerBuildException{};
+        }
+
+        static server Start(::grpc::ServerBuilder& builder) = delete;
+
+        server(server&&) = default;
+        server& operator=(server&&) = default;
+
+        ~server()
+        {
+            if (_server)
+            {
+                Shutdown();
+                Wait();
+            }
+        }
 
         /// @brief Shutdown the server, blocking until all rpc processing
         /// finishes.
@@ -86,16 +136,16 @@ namespace bond { namespace ext { namespace gRPC {
         ///
         /// @param deadline How long to wait until pending rpcs are
         /// forcefully terminated.
-        template <class T>
+        template <typename T>
         void Shutdown(const T& deadline)
         {
-            _grpcServer->Shutdown(deadline);
+            _server->Shutdown(deadline);
         }
 
         /// Shutdown the server, waiting for all rpc processing to finish.
         void Shutdown()
         {
-            _grpcServer->Shutdown();
+            _server->Shutdown();
         }
 
         /// @brief Block waiting for all work to complete.
@@ -104,25 +154,35 @@ namespace bond { namespace ext { namespace gRPC {
         /// thread must call \p Shutdown for this function to ever return.
         void Wait()
         {
-            _grpcServer->Wait();
+            _server->Wait();
         }
 
-        friend class server_builder_core<TThreadPool>;
+    private:
+        server(
+            std::unique_ptr<::grpc::Server> server,
+            std::vector<std::unique_ptr<detail::service>> services,
+            std::unique_ptr<io_manager> ioManager)
+            : _server{ std::move(server) },
+              _services{ std::move(services) },
+              _ioManager{ std::move(ioManager) }
+        {
+            BOOST_ASSERT(_server);
+            BOOST_ASSERT(_ioManager);
 
-private:
-    server_core(
-        std::unique_ptr<grpc::Server> grpcServer,
-        std::unique_ptr<grpc::ServerCompletionQueue> cq)
-        : _grpcServer(std::move(grpcServer)),
-          _ioManager(std::move(cq))
-    {
-        BOOST_ASSERT(_grpcServer);
-    }
+            start();
+        }
 
-        std::unique_ptr<grpc::Server> _grpcServer;
-        io_manager _ioManager;
+        void start()
+        {
+            for (auto& service : _services)
+            {
+                service->start();
+            }
+        }
+
+        std::unique_ptr<::grpc::Server> _server;
+        std::vector<std::unique_ptr<detail::service>> _services;
+        std::unique_ptr<io_manager> _ioManager;
     };
 
-    using server = server_core<bond::ext::gRPC::thread_pool>;
-
-} } } //namespace bond::ext::gRPC
+} } } //namespace bond::ext::grpc

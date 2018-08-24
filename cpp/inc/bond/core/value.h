@@ -3,11 +3,12 @@
 
 #pragma once
 
-#include <boost/static_assert.hpp>
+#include <bond/core/config.h>
 
-#include "config.h"
 #include "protocol.h"
 #include "schema.h"
+
+#include <boost/static_assert.hpp>
 
 namespace bond
 {
@@ -182,38 +183,33 @@ public:
           _skip(skip)
     {}
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     value_common(value_common&& rhs) BOND_NOEXCEPT_IF(
-        bond::is_nothrow_copy_constructible<Reader>::value)
-        : _input(rhs._input),
+        BOND_NOEXCEPT_EXPR(detail::move_data<Reader>(rhs._input)))
+        : _input(detail::move_data<Reader>(rhs._input)),
           _skip(std::move(rhs._skip))
     {
         rhs._skip = false;
     }
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
     value_common(const value_common& that) = default;
     value_common& operator=(const value_common& that) = default;
-#endif
 
     ~value_common()
     {
         // skip the value if it has not been read
         if (_skip)
-            bond::Skip<T, typename remove_reference<Reader>::type>(_input, std::nothrow);
+            bond::Skip<T, typename std::remove_reference<Reader>::type>(_input, std::nothrow);
     }
 
     void Skip() const
     {
         _skip = false;
-        bond::Skip<T, typename remove_reference<Reader>::type>(_input);
+        bond::Skip<T, typename std::remove_reference<Reader>::type>(_input);
     }
 
     // skip value of non-matching type
     template <typename Protocols = BuiltInProtocols, typename X>
-    typename boost::disable_if_c<is_matching<T, X>::value>::type
-    Deserialize(X& /*var*/) const
+    void Deserialize(X& /*var*/, typename boost::disable_if<is_matching<T, X> >::type* = nullptr) const
     {
         Skip();
     }
@@ -236,17 +232,13 @@ public:
         : value_common<T, Reader>(input, skip)
     {}
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     value(value&& rhs) BOND_NOEXCEPT_IF((
-        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
+        std::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
     value(const value& that) = default;
     value& operator=(const value& that) = default;
-#endif
 
     /// @brief Deserialize the value
     template <typename Protocols = BuiltInProtocols>
@@ -261,7 +253,7 @@ public:
     template <typename Protocols = BuiltInProtocols>
     void Deserialize(blob& var, uint32_t size) const
     {
-        BOOST_STATIC_ASSERT((is_same<T, blob::value_type>::value));
+        BOOST_STATIC_ASSERT((std::is_same<T, blob::value_type>::value));
         _skip = false;
         _input.Read(var, size);
     }
@@ -272,7 +264,7 @@ public:
     typename boost::enable_if_c<is_matching_basic<T, X>::value && !is_string_type<T>::value>::type
     Deserialize(X& var) const
     {
-        typename boost::mpl::if_c<is_enum<X>::value && sizeof(X) == sizeof(T), X, T>::type data;
+        typename std::conditional<std::is_enum<X>::value && sizeof(X) == sizeof(T), X, T>::type data;
 
         _skip = false;
         _input.Read(data);
@@ -308,17 +300,13 @@ public:
         : value_common<T, Reader>(input, skip)
     {}
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     value(value&& rhs) BOND_NOEXCEPT_IF((
-        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
+        std::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
     value(const value& that) = default;
     value& operator=(const value& that) = default;
-#endif
 
     template <typename Protocols = BuiltInProtocols>
     void Deserialize(T& var) const
@@ -345,17 +333,13 @@ public:
         : value_common<T, Reader>(input, skip)
     {}
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     value(value&& rhs) BOND_NOEXCEPT_IF((
-        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
+        std::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
     value(const value& that) = default;
     value& operator=(const value& that) = default;
-#endif
 
     // deserialize Bond struct into matching variable
     template <typename Protocols = BuiltInProtocols, typename X>
@@ -420,17 +404,13 @@ public:
         : value_common<T, Reader>(input, skip)
     {}
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     value(value&& rhs) BOND_NOEXCEPT_IF((
-        bond::is_nothrow_move_constructible<value_common<T, Reader> >::value))
+        std::is_nothrow_move_constructible<value_common<T, Reader> >::value))
         : value_common<T, Reader>(std::move(rhs))
     {}
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
     value(const value& that) = default;
     value& operator=(const value& that) = default;
-#endif
 
     // Deserialize container
     template <typename Protocols = BuiltInProtocols, typename X>
@@ -491,24 +471,20 @@ public:
         _schemaDef.root.id = type;
     }
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     value(value&& rhs) BOND_NOEXCEPT_IF(
-        bond::is_nothrow_move_constructible<Reader>::value
-        && bond::is_nothrow_move_constructible<SchemaDef>::value
-        && bond::is_nothrow_move_constructible<RuntimeSchema>::value)
-        : _input(rhs._input),
+        BOND_NOEXCEPT_EXPR(detail::move_data<Reader>(rhs._input))
+        && std::is_nothrow_move_constructible<SchemaDef>::value
+        && std::is_nothrow_move_constructible<RuntimeSchema>::value)
+        : _input(detail::move_data<Reader>(rhs._input)),
           _schemaDef(std::move(rhs._schemaDef)),
           _schema(std::move(rhs._schema)),
           _skip(std::move(rhs._skip))
     {
         rhs._skip = false;
     }
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
     value(const value& that) = default;
     value& operator=(const value& that) = default;
-#endif
 
     ~value()
     {
@@ -672,20 +648,19 @@ inline DeserializeElements(X& var, const T& element, uint32_t size)
 }
 
 
-template <typename Protocols, typename X, typename Allocator, bool useValue, typename T>
+template <typename Protocols, typename X, typename T>
 typename boost::enable_if<is_matching<T, X> >::type
-inline DeserializeElements(nullable<X, Allocator, useValue>& var, const T& element, uint32_t size)
+inline DeserializeElements(nullable<X>& var, const T& element, uint32_t size)
 {
     resize_list(var, size);
 
-    for (enumerator<nullable<X, Allocator, useValue> > items(var); items.more(); --size)
+    for (enumerator<nullable<X> > items(var); items.more(); --size)
         element.template Deserialize<Protocols>(items.next());
 
     // Wire representation and interface for nullable is the same as for list.
     // However nullable can "contain" at most one element. If there are more
     // elements in the payload we skip them.
-    while (size--)
-        element.Skip();
+    detail::SkipElements(element, size);
 }
 
 
@@ -717,8 +692,7 @@ template <typename Protocols, typename X, typename T>
 typename boost::disable_if<is_element_matching<T, X> >::type
 inline DeserializeElements(X&, const T& element, uint32_t size)
 {
-    while (size--)
-        element.Skip();
+    detail::SkipElements(element, size);
 }
 
 
@@ -750,8 +724,7 @@ inline void SkipContainer(const T& element, Reader& input)
         input.ReadContainerBegin(size, type);
     }
 
-    while (size--)
-        element.Skip();
+    detail::SkipElements(element, size);
 
     input.ReadContainerEnd();
 }
@@ -816,8 +789,7 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
     }
     else
     {
-        while (size--)
-            input.Skip(type);
+        detail::SkipElements(type, input, size);
     }
 
     input.ReadContainerEnd();
@@ -842,8 +814,7 @@ inline DeserializeContainer(X& var, const T& element, Reader& input)
         {
             if (type == GetTypeId(element))
             {
-                while (size--)
-                    element.Skip();
+                detail::SkipElements(element, size);
             }
             else
             {
@@ -921,11 +892,7 @@ inline void SkipMap(BondDataType keyType, const T& element, Reader& input)
         input.ReadContainerBegin(size, type);
     }
 
-    while (size--)
-    {
-        input.Skip(keyType);
-        element.Skip();
-    }
+    detail::SkipElements(keyType, element, input, size);
 
     input.ReadContainerEnd();
 }
@@ -983,11 +950,7 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
     }
     else
     {
-        while (size--)
-        {
-            input.Skip(type.first);
-            input.Skip(type.second);
-        }
+        detail::SkipElements(type.first, type.second, input, size);
     }
 
     input.ReadContainerEnd();
@@ -1012,11 +975,7 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
         {
             if (type.second == GetTypeId(element))
             {
-                while (size--)
-                {
-                    input.Skip(type.first);
-                    element.Skip();
-                }
+                detail::SkipElements(type.first, element, input, size);
             }
             else
             {
@@ -1040,3 +999,12 @@ inline DeserializeMap(X& var, BondDataType keyType, const T& element, Reader& in
 
 
 } // namespace bond
+
+
+#ifdef BOND_LIB_TYPE
+#if BOND_LIB_TYPE != BOND_LIB_TYPE_HEADER
+#include "detail/value_extern.h"
+#endif
+#else
+#error BOND_LIB_TYPE is undefined
+#endif

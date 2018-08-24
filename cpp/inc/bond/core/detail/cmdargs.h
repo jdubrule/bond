@@ -3,10 +3,13 @@
 
 #pragma once
 
-#include <iostream>
+#include <bond/core/config.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
+
+#include <iostream>
 
 namespace bond
 {
@@ -14,7 +17,7 @@ namespace cmd
 {
 namespace detail
 {
-    
+
 // Enum types already have generated overload for ToString.
 // For other types we use boost::lexical_cast.
 template <typename T>
@@ -122,14 +125,14 @@ private:
 
     template <typename T>
     typename boost::disable_if_c<bond::is_list_container<T>::value
-        || is_enum<T>::value, std::string>::type
+        || std::is_enum<T>::value, std::string>::type
     HelpFromType() const
     {
             return "";
     }
 
     template <typename T>
-    typename boost::enable_if<is_enum<T>, std::string>::type
+    typename boost::enable_if<std::is_enum<T>, std::string>::type
     HelpFromType() const
     {
             std::string enums;
@@ -220,12 +223,12 @@ public:
             params.push_back(Param(name, value));
         }
     }
-    
+
     // GetFlag
     bool GetFlag(const std::string& flag, const std::string& abbr)
     {
         Params::iterator it = FindParam(flag, abbr);
-            
+
         if (it != params.end())
         {
             if (!it->value.empty())
@@ -247,7 +250,7 @@ public:
     bool GetParam(const std::string& flag, const std::string& abbr, std::string& value)
     {
         Params::iterator it = FindParam(flag, abbr);
-            
+
         if (it != params.end())
         {
             value = it->value;
@@ -309,7 +312,7 @@ private:
                 it->used = true;
                 break;
             }
-                
+
         return it;
     }
 
@@ -330,7 +333,7 @@ public:
     CmdArg(const boost::shared_ptr<Options>& options, bool partial = false)
         : options(options),
           partial(partial)
-    {}    
+    {}
 
     void Begin(const detail::Metadata& /*metadata*/) const
     {}
@@ -342,7 +345,7 @@ public:
             std::string leftovers = options->Leftovers();
 
             if (!leftovers.empty())
-                throw std::runtime_error("Invalid parameter(s):\n" + leftovers); 
+                throw std::runtime_error("Invalid parameter(s):\n" + leftovers);
         }
     }
 
@@ -371,8 +374,8 @@ public:
 private:
     // Parse enum
     template <typename T>
-    typename boost::enable_if<is_enum<T> >::type
-    Parse(const std::string& value, T& var) const 
+    typename boost::enable_if<std::is_enum<T> >::type
+    Parse(const std::string& value, T& var) const
     {
         if (!ToEnum(var, value.c_str()))
             throw std::runtime_error("Invalid parameter(s):\n    " + value);
@@ -380,7 +383,7 @@ private:
 
     // Parse number
     template <typename T>
-    typename boost::enable_if<boost::is_arithmetic<T> >::type
+    typename boost::enable_if<std::is_arithmetic<T> >::type
     Parse(const std::string& value, T& var) const
     {
         try
@@ -407,11 +410,11 @@ private:
         typedef boost::tokenizer<boost::escaped_list_separator<char> > tokenizer;
 
         tokenizer tok(value);
-        
+
         for(tokenizer::iterator it = tok.begin(); it != tok.end(); ++it)
         {
             typename bond::element_type<T>::type tmp;
-            
+
             Parse(*it, tmp);
             var.push_back(tmp);
         }
@@ -423,7 +426,7 @@ private:
         Parse(value, var.set_value());
     }
 
-    
+
     // bool param
     bool GetParam(const detail::Metadata& metadata, bool& var) const
     {
@@ -445,17 +448,17 @@ private:
             options->GetParam(value);
         else
             options->GetParam(metadata.Flag(), metadata.Abbr(), value);
-        
+
         if (value.empty())
         {
             if(!metadata.IsOptional())
                 throw std::runtime_error("Required parameter " + metadata.Param() + " missing.");
-            else    
+            else
                 return false;
         }
-        
+
         Parse(value, var);
-        
+
         return true;
     }
 
@@ -518,7 +521,7 @@ public:
 protected:
     void Print(const std::string& arg, const std::string& abbr, const std::string& help) const
     {
-        int indent = std::max(30, static_cast<int>(arg.size()) + 5);
+        int indent = (std::max)(30, static_cast<int>(arg.size()) + 5);
         std::string formated = FormatHelp(help, indent);
         out << " ";
         out.width(2);
@@ -535,10 +538,10 @@ protected:
 
         for (int begin = 0; i < static_cast<int>(formated.length()); begin += 80, i = begin + 79 - indent)
         {
-            while (i >= begin && !isspace(formated[i]))
+            while (i >= begin && !isspace(static_cast<int>(formated[i])))
                 --i;
 
-            while (i < static_cast<int>(formated.length()) && isspace(formated[i]))
+            while (i < static_cast<int>(formated.length()) && isspace(static_cast<int>(formated[i])))
                 ++i;
 
             formated.insert(i, begin + 80 - i, ' ');

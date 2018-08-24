@@ -17,6 +17,18 @@
     version: 1.0.{build}
     clone_depth: 15
 
+    skip_commits:
+      files:
+        # These files are high-churn, but don't affect the build.
+        #
+        # NB: README.md is NOT in this list; the documentation build
+        # consumes it.
+        - CHANGELOG.md
+        # These files are only used by the Travis CI builds and don't affect
+        # the Windows builds.
+        - .travis.yml
+        - tools/ci-scripts/linux/**
+
     environment:
         global:
             STACK_ROOT: "c:\\sr"
@@ -28,62 +40,54 @@
         matrix:
               # C++ Core build and tests (Visual C++ 2013)
             - BOND_BUILD: C++
-              BOND_VS: "Visual Studio 12 2013"
-              BOND_VS_NUM: 12
+              BOND_VS_VERSION: Visual Studio 2013
+              # We need to use the Visual Studio 2015 image for the 2013 build
+              # as the C# compatibility tests need a C# 6 compiler, which is
+              # available starting with the 2015 image.
+              APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
               BOND_ARCH: 32
-              BOND_BOOST: 58
+              BOND_BOOST: "1.61.0"
               BOND_CMAKE_FLAGS: "-DBOND_ENABLE_GRPC=FALSE;-DBOND_SKIP_GBC_TESTS=TRUE"
               # C++ Core build and tests
             - BOND_BUILD: C++
-              BOND_VS: "Visual Studio 14 2015"
-              BOND_VS_NUM: 14
+              APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
               BOND_ARCH: 64
-              BOND_BOOST: 60
+              BOND_BOOST: "1.61.0"
               BOND_CMAKE_FLAGS: "-DBOND_ENABLE_GRPC=FALSE"
             - BOND_BUILD: C#
               BOND_OUTPUT: Properties
-              BOND_CONFIG: Debug
-            - BOND_BUILD: "C# .NET Core"
               BOND_CONFIG: Debug
             - BOND_BUILD: Doc
             - BOND_BUILD: C#
               BOND_OUTPUT: Fields
               BOND_CONFIG: Fields
             - BOND_BUILD: Python
-              BOND_VS: "Visual Studio 14 2015"
-              BOND_VS_NUM: 14
+              APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
               BOND_ARCH: 32
-              BOND_BOOST: 60
+              BOND_BOOST: "1.62.0"
               BOND_CMAKE_FLAGS: "-DBOND_ENABLE_GRPC=FALSE"
             - BOND_BUILD: Python
-              BOND_VS: "Visual Studio 14 2015"
-              BOND_VS_NUM: 14
+              APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
               BOND_ARCH: 64
-              BOND_BOOST: 63
+              BOND_BOOST: "1.63.0"
               BOND_CMAKE_FLAGS: "-DBOND_ENABLE_GRPC=FALSE"
-              # C++ Comm build and tests
-            - BOND_BUILD: C++
-              BOND_VS: "Visual Studio 14 2015"
-              BOND_VS_NUM: 14
-              BOND_ARCH: 64
-              BOND_BOOST: 63
-              BOND_CMAKE_FLAGS: "-DBOND_ENABLE_COMM=TRUE;-DBOND_ENABLE_GRPC=FALSE;-DBOND_SKIP_CORE_TESTS=TRUE;-DBOND_SKIP_GBC_TESTS=TRUE"
               # C++ gRPC build and tests
             - BOND_BUILD: C++
-              BOND_VS: "Visual Studio 14 2015"
-              BOND_VS_NUM: 14
+              APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
               BOND_ARCH: 64
-              BOND_BOOST: 63
+              BOND_BOOST: "1.63.0"
               BOND_CMAKE_FLAGS: "-DBOND_SKIP_CORE_TESTS=TRUE;-DBOND_SKIP_GBC_TESTS=TRUE"
-              # C++ Comm build and tests (Visual C++ 2013)
-            - BOND_BUILD: C++
-              BOND_VS: "Visual Studio 12 2013"
-              BOND_VS_NUM: 12
-              BOND_ARCH: 64
-              BOND_BOOST: 58
-              BOND_CMAKE_FLAGS: "-DBOND_ENABLE_COMM=TRUE;-DBOND_ENABLE_GRPC=FALSE;-DBOND_SKIP_CORE_TESTS=TRUE;-DBOND_SKIP_GBC_TESTS=TRUE"
     install:
         - ps: >-
+            if (-not $env:BOND_VS_VERSION)
+            {
+                $env:BOND_VS_VERSION = $env:APPVEYOR_BUILD_WORKER_IMAGE
+                if (-not $env:BOND_VS_VERSION)
+                {
+                    $env:BOND_VS_VERSION = 'Visual Studio 2015'
+                }
+            }
+
             if (($env:BOND_BUILD -eq 'C++') -or ($env:BOND_BUILD -eq 'Python')) {
 
                 git submodule update --init thirdparty\rapidjson
@@ -94,20 +98,45 @@
                     git submodule update --init --recursive thirdparty\grpc
                 }
 
-            }
+                $boostComponents = (
+                    'boost_chrono',
+                    'boost_date_time',
+                    'boost_thread',
+                    'boost_system',
+                    'boost_unit_test_framework')
 
-            if ($env:BOND_BOOST -eq 56) {
-                # Hard-coded Boost path per https://www.appveyor.com/docs/installed-software#languages-libraries-frameworks
+                if ($env:BOND_BUILD -eq 'Python') {
+                    $boostComponents += 'boost_python'
+                }
 
-                $env:BOOST_ROOT = "C:/Libraries/boost"
-                $env:BOOST_LIBRARYDIR = "C:/Libraries/boost/lib${env:BOND_ARCH}-msvc-${env:BOND_VS_NUM}.0"
-            }
-            else {
-                $env:BOOST_ROOT = "C:/Libraries/boost_1_${env:BOND_BOOST}_0"
-                $env:BOOST_LIBRARYDIR = "C:/Libraries/boost_1_${env:BOND_BOOST}_0/lib${env:BOND_ARCH}-msvc-${env:BOND_VS_NUM}.0"
+                $vcToolsetVer = tools\ci-scripts\windows\ConvertTo-MsvcVersion.ps1 `
+                    -ImageName $env:BOND_VS_VERSION `
+                    -Format VcToolSetVer
+
+                $boostLoc = tools\ci-scripts\windows\Get-BoostLocation.ps1 `
+                    -Version $env:BOND_BOOST `
+                    -VcToolSetVer $vcToolSetVer
+
+                if (-not $boostLoc)
+                {
+                    $boostLoc = tools\ci-scripts\windows\Install-Boost.ps1 `
+                        -Version $env:BOND_BOOST `
+                        -VcToolSetVer $vcToolSetVer `
+                        -Components $boostComponents
+                }
+
+                if ((-not $boostLoc) -or (-not $boostLoc['BOOST_LIBRARYDIR'][$env:BOND_ARCH]))
+                {
+                    throw "No Boost libraries found/installed for $env:BOND_BOOST $env:BOND_ARCH"
+                }
+
+                $env:BOOST_ROOT = $boostLoc['BOOST_ROOT']
+                $env:BOOST_LIBRARYDIR = $boostLoc['BOOST_LIBRARYDIR'][$env:BOND_ARCH]
             }
 
             choco install haskell-stack -y
+
+            choco install dotnetcore-sdk -y
 
             # choco install updated the path, so re-read them from the registry and reset $env:path
 
@@ -156,7 +185,15 @@
 
             $env:_IsNativeEnvironment = "true"
 
-            $cmakeGenerator = $env:BOND_VS
+            $vsCmakeGeneratorNum = tools\ci-scripts\windows\ConvertTo-MsvcVersion.ps1 `
+                -ImageName $env:BOND_VS_VERSION `
+                -Format CMakeGeneratorNum
+
+            $vsYear = tools\ci-scripts\windows\ConvertTo-MsvcVersion.ps1 `
+                -ImageName $env:BOND_VS_VERSION `
+                -Format Year
+
+            $cmakeGenerator = "Visual Studio $vsCmakeGeneratorNum $vsYear"
 
             if ($env:BOND_ARCH -eq 64) {
                 $cmakeGenerator += " Win64"
@@ -166,7 +203,7 @@
 
             if ($env:BOND_BUILD -eq "C#" -Or $env:BOND_BUILD -eq "C++") {
 
-                nuget restore cs\cs.sln
+                dotnet restore cs\cs.sln
 
             }
 
@@ -186,7 +223,7 @@
 
                 cd build
 
-                cmake "-DBoost_ADDITIONAL_VERSIONS=1.${env:BOND_BOOST}.0" $cmakeFlags -G $cmakeGenerator ..
+                cmake "-DBoost_ADDITIONAL_VERSIONS=${env:BOND_BOOST}" $cmakeFlags -G $cmakeGenerator ..
 
             }
 
@@ -196,9 +233,9 @@
                 # on what part of C++ we're building--but they're pretty
                 # fast to build, so build them all.
 
-                $compatTests = ('Tests\CommCompatClient', 'Tests\CommCompatServer', 'Tests\Compat', 'Tests\GrpcCompatClient', 'Tests\GrpcCompatServer')
+                $compatTests = ('Tests\Compat', 'Tests\GrpcCompatClient', 'Tests\GrpcCompatServer')
 
-                msbuild cs\cs.sln /verbosity:minimal "/target:$($compatTests -join ';')" /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+                dotnet msbuild cs\cs.sln /verbosity:minimal "/target:$($compatTests -join ';')"
 
                 if (-not $?) { throw "cs compat build failed" }
 
@@ -274,13 +311,7 @@
 
             if ($env:BOND_BUILD -eq "C#") {
 
-                msbuild cs\cs.sln /verbosity:minimal /p:Configuration=${env:BOND_CONFIG} /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-
-            }
-
-            if ($env:BOND_BUILD -eq "C# .NET Core") {
-
-                & cs\dnc\build.ps1 -Configuration $env:BOND_CONFIG -Verbosity minimal -MSBuildLogger "C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+                dotnet msbuild cs\cs.sln /verbosity:minimal /p:Configuration=${env:BOND_CONFIG}
 
             }
 
@@ -296,27 +327,20 @@
             }
 
             if ($env:BOND_BUILD -eq "C#") {
-
-                nunit-console-x86 /framework:net-4.5 /labels "cs\test\core\bin\debug\net45\${env:BOND_OUTPUT}\Bond.UnitTest.dll" cs\test\internal\bin\debug\net45\Bond.InternalTest.dll
+                dotnet test cs\test\core\Core.csproj
                 if (-not $?) { throw "tests failed" }
 
-                nunit-console-x86 /framework:net-4.5 /labels "cs\test\core\bin\debug\net45-nonportable\${env:BOND_OUTPUT}\Bond.UnitTest.dll"
+                dotnet test cs\test\coreNS10\CoreNS10.csproj
                 if (-not $?) { throw "tests failed" }
 
-                & examples\cs\grpc\pingpong\bin\Debug\pingpong.exe
+                dotnet test cs\test\internal\Internal.csproj
                 if (-not $?) { throw "tests failed" }
 
-                # We need to investigate why these tests are failing in AppVeyor, but not locally.
-                # nunit-console-x86 /framework:net-4.5 /labels "cs\test\comm\bin\debug\net45\${env:BOND_OUTPUT}\Bond.Comm.UnitTest.dll"
-                # if (-not $?) { throw "tests failed" }
-
-            }
-
-            if ($env:BOND_BUILD -eq "C# .NET Core") {
-
-                & cs\dnc\build.ps1 -Test -Configuration $env:BOND_CONFIG -Verbosity minimal -MSBuildLogger "C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+                dotnet test cs\test\grpc\grpc.csproj
                 if (-not $?) { throw "tests failed" }
 
+                & cs\test\test-examples.ps1 -IgnorePatterns '*\shared-types-assembly\*' -ErrorVariable exampleErrors
+                if ($exampleErrors) { throw "One or more example failed. See above for details." }
             }
 
             if (-not $?) { throw "build failed" }

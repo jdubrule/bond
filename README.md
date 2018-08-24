@@ -11,19 +11,13 @@ data. It supports cross-language serialization/deserialization and powerful
 generic mechanisms for efficiently manipulating data. Bond is broadly used at
 Microsoft in high scale services.
 
-**IMPORTANT NOTE: The [Bond Communications framework](https://Microsoft.github.io/bond/manual/bond_comm.html)
--- known as Bond Comm -- is deprecated. We recommend using
-[Bond-over-gRPC](https://Microsoft.github.io/bond/manual/bond_over_grpc.html) for communication.
-The [Bond Comm C# manual](https://Microsoft.github.io/bond/manual/bond_cs.html#bond-comm)
-and the [Bond Comm C++ manual](https://Microsoft.github.io/bond/manual/bond_cpp.html#bond-comm)
-are preserved for transition purposes.**
-
 Bond is published on GitHub at [https://github.com/Microsoft/bond/](https://github.com/Microsoft/bond/).
 
 For details, see the User's Manuals:
 
 * [C++](https://Microsoft.github.io/bond/manual/bond_cpp.html)
 * [C#](https://Microsoft.github.io/bond/manual/bond_cs.html)
+* [Java](https://Microsoft.github.io/bond/manual/bond_java.html)
 * [Python](https://Microsoft.github.io/bond/manual/bond_py.html)
 * [Bond-over-gRPC](https://Microsoft.github.io/bond/manual/bond_over_grpc.html)
 * [`gbc`, the Bond compiler/codegen tool](https://microsoft.github.io/bond/manual/compiler.html)
@@ -35,24 +29,28 @@ For a discussion how Bond compares to similar frameworks see [Why Bond](https://
 
 ## Dependencies
 
-The Bond repository uses Git submodules and should be cloned with the
-`--recursive` flag:
+Bond C++ library requires some C++11 features (currently limited to those
+supported bv Visual C++ 2013); a C++11 compiler is required. Additionally,
+to build Bond you will need CMake (3.1+),
+[Haskell Stack](https://docs.haskellstack.org/en/stable/README/#how-to-install)
+(1.5.1+) and Boost (1.61+).
+
+Additionally, Bond requires RapidJSON and optionally requires gRPC. The Bond repository primarily uses Git submodules for these two dependencies. It should be cloned with the `--recursive` flag:
 
 ```bash
 git clone --recursive https://github.com/Microsoft/bond.git
 ```
 
-In order to build Bond you will need CMake (3.1+), [Haskell Stack](https://docs.haskellstack.org/en/stable/README/#how-to-install) and
-Boost (1.58+). Bond's C++ library requires some C++11 features (currently
-limited to those supported bv Visual C++ 2013). (Note: Boost 1.59 may not
-work with Bond Comm due to some bugs in that version of the Boost ASIO library).
+If you already have RapidJSON and would like to build against it, add argument `-DBOND_FIND_RAPIDJSON=TRUE` to the CMake invocation. It will use find_package(RapidJSON). If you do not provide a RapidJSON library, Bond will also install RapidJSON.
+
+If you do not wish to build the gRPC component, add argument `-DBOND_ENABLE_GRPC=FALSE` to the CMake invocation.
 
 Following are specific instructions for building on various platforms.
 
 ### Linux
 
-Bond can be built with Clang (3.4+) or GNU C++ (4.7+). We recommend the latest
-version of Clang as it's much faster with template-heavy code like Bond.
+Bond must be built with C++11 compiler. We test with Clang (3.8) and GNU C++
+(5.4). We recommend Clang as it's faster with template-heavy code like Bond.
 
 Run the following commands to install the minimal set of packages needed to
 build the core Bond library on Ubuntu 14.04:
@@ -61,10 +59,19 @@ build the core Bond library on Ubuntu 14.04:
 sudo apt-get install \
     clang \
     cmake \
-    haskell-stack \
     zlib1g-dev \
     libboost-dev \
     libboost-thread-dev
+```
+
+Additionally, you need the [Haskell Tool
+Stack](https://docs.haskellstack.org/en/stable/README/). If your distro isn't
+shipping a new enough version of it, you may encounter some non-obvious build
+failures, so we recommend installing the latest Stack outside of package
+management:
+
+```bash
+curl -sSL https://get.haskellstack.org/ | sh
 ```
 
 In the root `bond` directory run:
@@ -77,23 +84,29 @@ make
 sudo make install
 ```
 
-The `build` directory is just an example. Any directory can be used as the build
-destination.
+The `build` directory is just an example. Any directory can be used as the
+build destination.
 
-In order to build all the C++ and Python tests and examples, as well as
-Bond-over-gRPC, a few more packages are needed, and CMake needs to be run with
-different options:
+In order to build the Bond Python module, all the C++/Python tests and
+examples, and Bond-over-gRPC, a few more packages are needed.
 
 ```bash
 sudo apt-get install \
     autoconf \
     build-essential \
+    golang \
     libboost-date-time-dev \
     libboost-python-dev \
     libboost-test-dev \
     libtool \
     python2.7-dev
+```
 
+CMake needs to be re-run with different options. This can be done after
+building just the core libraries: the build tree will simply be updated with
+the new options.
+
+```bash
 cd build # or wherever you ran CMake before
 cmake -DBOND_ENABLE_GRPC=TRUE -DgRPC_ZLIB_PROVIDER=package ..
 ```
@@ -103,12 +116,13 @@ the tests and examples:
 
 ```bash
 make --jobs 8 check
+sudo make install # To install the other libraries just built
 ```
 
 (The unit tests are large so you may want to run 4-8 build jobs in parallel,
 assuming you have enough memory.)
 
-### OS X
+### macOS
 
 Install Xcode and then run the following command to install the required
 packages using Homebrew ([http://brew.sh/](http://brew.sh/)):
@@ -123,7 +137,7 @@ brew install \
 
 (boost-python is optional and only needed for Python support.)
 
-Bond can be built on OS X using either standard \*nix makefiles or Xcode. In
+Bond can be built on macOS using either standard \*nix makefiles or Xcode. In
 order to generate and build from makefiles, in the root `bond` directory run:
 
 ```bash
@@ -169,11 +183,12 @@ cmake .. \
 
 Install the following tools:
 
-- Visual Studio 2013 or 2015
-    - Visual Studio 2015 is required to build C# Bond from source
+- Visual Studio 2013, 2015, or 2017
+    - VS2017 is required to build C# Bond from source
+- .NET Core SDK ([https://www.microsoft.com/net/core](https://www.microsoft.com/net/core#windows))
+    - Alternative to VS2017 for building C# Bond from source
 - CMake ([http://www.cmake.org/download/](http://www.cmake.org/download/))
 - Haskell Stack ([https://docs.haskellstack.org/en/stable/install_and_upgrade/#windows](https://docs.haskellstack.org/en/stable/install_and_upgrade/#windows))
-- .NET Core SDK ([https://www.microsoft.com/net/core](https://www.microsoft.com/net/core#windows))
 
 If you are building on a network behind a proxy, set the environment variable
 `HTTP_PROXY`, e.g.:
@@ -182,20 +197,20 @@ If you are building on a network behind a proxy, set the environment variable
 set HTTP_PROXY=http://your-proxy-name:80
 ```
 
-Now you are ready to build the C# 4.0/4.5 version of Bond. Open the solution
-file `cs\cs.sln` in Visual Studio and build as usual. The C# unit tests can
+Now you are ready to build the C# version of Bond. Open the solution file
+`cs\cs.sln` in Visual Studio and build as usual. The C# unit tests can
 also be run from within the solution.
 
-To build the .NET Core version of Bond, run the build script. The `-Test`
-switch is used to run the unit tests as well.
+To build using the .NET Core SDK:
 
 ```bash
-.\cs\dnc\build -Test
+dotnet restore cs\cs.sln
+dotnet msbuild cs\cs.sln
 ```
 
 The C++ and Python versions of Bond additionally require:
 
-- Boost 1.58+ ([http://www.boost.org/users/download/](http://www.boost.org/users/download/))
+- Boost 1.61+ ([http://www.boost.org/users/download/](http://www.boost.org/users/download/))
 - Python 2.7 ([https://www.python.org/downloads/](https://www.python.org/downloads/))
 
 You may need to set the environment variables `BOOST_ROOT` and `BOOST_LIBRARYDIR`
@@ -203,12 +218,12 @@ to specify where Boost and its pre-built libraries for your environment (MSVC 12
 found, e.g.:
 
 ```bash
-set BOOST_ROOT=D:\boost_1_58_0
-set BOOST_LIBRARYDIR=D:\boost_1_58_0\lib64-msvc-14.0
+set BOOST_ROOT=D:\boost_1_61_0
+set BOOST_LIBRARYDIR=D:\boost_1_61_0\lib64-msvc-14.0
 ```
 
 The core Bond library and most examples only require Boost headers. The
-pre-built libraries are only needed for unit tests, Python, gRPC, and Comm
+pre-built libraries are only needed for unit tests, Python, and gRPC
 support. If Boost or Python libraries are not found on the system, then some
 tests and examples will not be built.
 

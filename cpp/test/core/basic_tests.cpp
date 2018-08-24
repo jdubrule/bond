@@ -1,4 +1,5 @@
 #include <bond/core/bond_version.h>
+#include <bond/core/box.h>
 #include <bond/stream/output_counter.h>
 
 #include "precompiled.h"
@@ -219,11 +220,9 @@ struct CopyMoveTest
         X x(src);
         UT_Compare(x, src);
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
         X y(std::move(x)); 
         UT_Compare(y, src);
         UT_AssertIsTrue(moved(x));    
-#endif
     }
 };
 
@@ -391,6 +390,28 @@ TEST_CASE_BEGIN(SimpleBinaryVersion)
 }
 TEST_CASE_END
 
+TEST_CASE_BEGIN(MakeBoxTest)
+{
+    // const T&
+    {
+        const int x = 123;
+        bond::Box<int> b = bond::make_box(x);
+        UT_AssertAreEqual(b.value, x);
+    }
+    // T&
+    {
+        int x = 123;
+        bond::Box<int> b = bond::make_box(x);
+        UT_AssertAreEqual(b.value, x);
+    }
+    // T&&
+    {
+        int x = 123;
+        bond::Box<int> b = bond::make_box(std::move(x));
+        UT_AssertAreEqual(b.value, x);
+    }
+}
+TEST_CASE_END
 
 void BasicTest::Initialize()
 {
@@ -421,6 +442,7 @@ void BasicTest::Initialize()
     AddTestCase<TEST_ID(0xb06), SimpleBinaryVersion>(suite, "Simple Protocol version");
     AddTestCase<TEST_ID(0xb07), CopyMoveTests>(suite, "Copy and Move tests");
     AddTestCase<TEST_ID(0xb08), EnumScopeTest>(suite, "Enum scope tests");
+    AddTestCase<TEST_ID(0xb09), MakeBoxTest>(suite, "make_box tests");
 }
 
 

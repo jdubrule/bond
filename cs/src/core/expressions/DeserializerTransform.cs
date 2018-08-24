@@ -167,7 +167,7 @@ namespace Bond.Expressions
                     index = deserializeFuncs.Count;
                     deserializeIndex[schemaType] = index;
                     deserializeFuncs.Add(null);
-                    var result = Expression.Variable(objectType, objectType.Name);
+                    var result = Expression.Variable(objectType, $"{objectType.Name}_result");
                     deserializeFuncs[index] = Expression.Lambda<Func<R, object>>(
                         Expression.Block(
                             new[] { result },
@@ -241,7 +241,7 @@ namespace Bond.Expressions
         Expression Nullable(IParser parser, Expression var, Type schemaType, bool initialize)
         {
             return parser.Container(schemaType.GetBondDataType(),
-                (valueParser, valueType, next, count) =>
+                (valueParser, valueType, next, count, arraySegment) =>
                 {
                     var body = new List<Expression>();
 
@@ -260,7 +260,7 @@ namespace Bond.Expressions
             var itemSchemaType = schemaType.GetValueType();
 
             return parser.Container(itemSchemaType.GetBondDataType(),
-                (valueParser, elementType, next, count) =>
+                (valueParser, elementType, next, count, arraySegment) =>
                 {
                     Expression addItem;
                     ParameterExpression[] parameters;
@@ -491,7 +491,7 @@ namespace Bond.Expressions
             {
                 // Special handling for properties of struct types: we deserialize into
                 // a temp variable and then assign the value to the property.
-                var temp = Expression.Variable(var.Type, "temp");
+                var temp = Expression.Variable(var.Type, $"{var.Type.Name}_temp");
                 body = Expression.Block(
                     new[] { temp },
                     Value(parser, temp, valueType, schemaType, true),

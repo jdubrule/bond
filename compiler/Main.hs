@@ -14,7 +14,8 @@ import Prelude
 import Control.Concurrent.Async
 import GHC.Conc (getNumProcessors, setNumCapabilities)
 import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy.IO as L
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.IO as LTIO
 import Data.Aeson (encode)
 import qualified Data.ByteString.Lazy as BL
 import Language.Bond.Syntax.Types (Bond(..), Declaration(..), Import, Type(..))
@@ -36,6 +37,7 @@ main = do
     case options of
         Cpp {..}    -> cppCodegen options
         Cs {..}     -> csCodegen options
+        Java {..}   -> javaCodegen options
         Schema {..} -> writeSchema options
         _           -> print options
 
@@ -50,6 +52,12 @@ setJobs (Just n)
 
 concurrentlyFor_ :: [a] -> (a -> IO b) -> IO ()
 concurrentlyFor_ = (void .) . flip mapConcurrently
+
+
+createDir :: FilePath -> IO ()
+createDir path = do
+    -- recursive = True
+    createDirectoryIfMissing True path
 
 
 writeSchema :: Options -> IO()
@@ -70,28 +78,28 @@ writeSchema _ = error "writeSchema: impossible happened."
 
 cppCodegen :: Options -> IO()
 cppCodegen options@Cpp {..} = do
-    let typeMapping = maybe cppTypeMapping cppCustomAllocTypeMapping allocator
+    let typeMappingAliases = maybe cppTypeMapping (cppCustomAllocTypeMapping scoped_alloc_enabled) allocator
+    let typeMapping = if type_aliases_enabled then typeMappingAliases else cppExpandAliasesTypeMapping typeMappingAliases
     concurrentlyFor_ files $ codeGen options typeMapping templates
   where
     applyProto = map snd $ filter (enabled apply) protocols
     enabled a p = null a || fst p `elem` a
     protocols =
-        [ (Compact, ProtocolReader " ::bond::CompactBinaryReader< ::bond::InputBuffer>")
-        , (Compact, ProtocolWriter " ::bond::CompactBinaryWriter< ::bond::OutputBuffer>")
-        , (Compact, ProtocolWriter " ::bond::CompactBinaryWriter< ::bond::CompactBinaryCounter::type>")
-        , (Fast,    ProtocolReader " ::bond::FastBinaryReader< ::bond::InputBuffer>")
-        , (Fast,    ProtocolWriter " ::bond::FastBinaryWriter< ::bond::OutputBuffer>")
-        , (Simple,  ProtocolReader " ::bond::SimpleBinaryReader< ::bond::InputBuffer>")
-        , (Simple,  ProtocolWriter " ::bond::SimpleBinaryWriter< ::bond::OutputBuffer>")
+        [ (Compact, ProtocolReader " ::bond::CompactBinaryReader<::bond::InputBuffer>")
+        , (Compact, ProtocolWriter " ::bond::CompactBinaryWriter<::bond::OutputBuffer>")
+        , (Compact, ProtocolWriter " ::bond::CompactBinaryWriter<::bond::OutputBuffer>::Pass0")
+        , (Fast,    ProtocolReader " ::bond::FastBinaryReader<::bond::InputBuffer>")
+        , (Fast,    ProtocolWriter " ::bond::FastBinaryWriter<::bond::OutputBuffer>")
+        , (Simple,  ProtocolReader " ::bond::SimpleBinaryReader<::bond::InputBuffer>")
+        , (Simple,  ProtocolWriter " ::bond::SimpleBinaryWriter<::bond::OutputBuffer>")
         ]
     templates = concat $ map snd $ filter fst codegen_templates
     codegen_templates = [ (core_enabled, core_files)
-                        , (comm_enabled, [comm_h export_attribute, comm_cpp])
-                        , (grpc_enabled, [grpc_h export_attribute])
+                        , (grpc_enabled, [grpc_h export_attribute, grpc_cpp])
                         ]
     core_files = [
           reflection_h export_attribute
-        , types_h header enum_header allocator
+        , types_h export_attribute header enum_header allocator alloc_ctors_enabled type_aliases_enabled scoped_alloc_enabled
         , types_cpp
         , apply_h applyProto export_attribute
         , apply_cpp applyProto
@@ -111,9 +119,11 @@ csCodegen options@Cs {..} = do
             else if fields
                  then PublicFields
                  else Properties
+    constructorOptions = if constructor_parameters
+            then ConstructorParameters
+            else DefaultWithProtectedBase
     templates = concat $ map snd $ filter fst codegen_templates
-    codegen_templates = [ (structs_enabled, [types_cs Class fieldMapping])
-                        , (comm_enabled, [comm_interface_cs, comm_proxy_cs, comm_service_cs])
+    codegen_templates = [ (structs_enabled, [types_cs Class fieldMapping constructorOptions])
                         , (grpc_enabled, [grpc_cs])
                         ]
 csCodegen _ = error "csCodegen: impossible happened."
@@ -132,13 +142,58 @@ codeGen options typeMapping templates file = do
     namespaceMapping <- parseNamespaceMappings $ namespace options
     (Bond imports namespaces declarations) <- parseFile (import_dir options) file
     let mappingContext = MappingContext typeMapping aliasMapping namespaceMapping namespaces
-    case (anyServiceInheritance declarations, service_inheritance_enabled options, grpc_enabled options, comm_enabled options) of
-        (True, False, _, _)   -> fail "Use --enable-service-inheritance to enable service inheritance syntax."
-        (True, True, True, _) -> fail "Service inheritance is not supported in gRPC codegen."
-        (True, True, _, True) -> fail "Service inheritance is not supported in Comm codegen."
+    case (anyServiceInheritance declarations, service_inheritance_enabled options, grpc_enabled options) of
+        (True, False, _)   -> fail "Use --enable-service-inheritance to enable service inheritance syntax."
+        (True, True, True) -> fail "Service inheritance is not supported in gRPC codegen."
         _                     -> forM_ templates $ \template -> do
                                     let (suffix, code) = template mappingContext baseName imports declarations
                                     let fileName = baseName ++ suffix
                                     createDirectoryIfMissing True outputDir
-                                    let content = if (no_banner options) then code else (commonHeader "//" fileName <> code)
-                                    L.writeFile (outputDir </> fileName) content
+                                    let content = if (no_banner options) then code else (commonHeader "//" file fileName <> code)
+                                    LTIO.writeFile (outputDir </> fileName) content
+
+-- Java's class-per-file and package-as-path requirements make it difficult to
+-- share code with languages where there is a known set of generated files for
+-- each bondfile.
+javaCodegen :: Options -> IO ()
+javaCodegen Java {..} = do
+    namespaceMapping <- parseNamespaceMappings namespace
+
+    concurrentlyFor_ files $ \bondFile -> do
+        (Bond imports namespaces declarations) <- parseFile import_dir bondFile
+        -- AliasMappings not implemented.
+        let mappingContext = MappingContext javaTypeMapping [] namespaceMapping namespaces
+
+        forM_ declarations $ \declaration -> do
+            let javaNamespace = getDeclNamespace mappingContext declaration
+            let packageDir =
+                  output_dir </> case javaNamespace of
+                    x:xs -> foldl (</>) x xs
+                    []   -> error "declaration " ++ declName declaration ++  " has no namespace"
+            let javaFile = declName declaration ++ ".java"
+
+            let code = case declaration of
+                  Struct {} -> class_java mappingContext imports declaration
+                  Enum {}   -> enum_java mappingContext declaration
+                  _         -> mempty
+
+            if LT.null code
+                then return ()
+                else do
+                    let content =
+                          if no_banner
+                          then code
+                          else (commonHeader "//" safeBondFile safeJavaFile <> code)
+                              where
+                                  -- javac will always treat "\u" as the start
+                                  -- of a unicode escape sequence, and will
+                                  -- error out if it isn't followed by a valid
+                                  -- code. This breaks compilation of generated
+                                  -- code if either path has components that
+                                  -- start with u.
+                                  safeBondFile = slashForward bondFile
+                                  safeJavaFile = slashForward javaFile
+
+                    createDir packageDir
+                    LTIO.writeFile (packageDir </> javaFile) content
+javaCodegen _ = error "javaCodegen: impossible happened."

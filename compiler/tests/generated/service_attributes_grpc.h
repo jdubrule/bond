@@ -4,148 +4,100 @@
 #include "service_attributes_reflection.h"
 #include "service_attributes_types.h"
 
+
 #include <bond/core/bonded.h>
-#include <bond/ext/grpc/bond_utils.h>
-#include <bond/ext/grpc/client_callback.h>
-#include <bond/ext/grpc/io_manager.h>
-#include <bond/ext/grpc/thread_pool.h>
-#include <bond/ext/grpc/unary_call.h>
-#include <bond/ext/grpc/detail/client_call_data.h>
+#include <bond/ext/grpc/reflection.h>
+#include <bond/ext/grpc/detail/client.h>
 #include <bond/ext/grpc/detail/service.h>
-#include <bond/ext/grpc/detail/service_call_data.h>
 
 #include <boost/optional/optional.hpp>
 #include <functional>
 #include <memory>
 
-#ifdef _MSC_VER
-#pragma warning (push)
-#pragma warning (disable: 4100 4267)
-#endif
-
-#include <grpc++/impl/codegen/channel_interface.h>
-#include <grpc++/impl/codegen/client_context.h>
-#include <grpc++/impl/codegen/completion_queue.h>
-#include <grpc++/impl/codegen/rpc_method.h>
-#include <grpc++/impl/codegen/status.h>
-
-#ifdef _MSC_VER
-#pragma warning (pop)
-#endif
-
 namespace tests
 {
 
-class Foo final
+struct Foo final
 {
-public:
-    template <typename TThreadPool>
-    class ClientCore
+    struct Schema
     {
-    public:
-        ClientCore(
-            const std::shared_ptr< ::grpc::ChannelInterface>& channel,
-            std::shared_ptr< ::bond::ext::gRPC::io_manager> ioManager,
-            std::shared_ptr<TThreadPool> threadPool);
+        static const ::bond::Metadata metadata;
 
-        void Asyncfoo(::std::shared_ptr< ::grpc::ClientContext> context, const ::bond::bonded< ::tests::Param>& request, const std::function<void(std::shared_ptr< ::bond::ext::gRPC::unary_call_result< ::tests::Result>>)>& cb);
-        void Asyncfoo(::std::shared_ptr< ::grpc::ClientContext> context, const ::tests::Param& request, const std::function<void(std::shared_ptr< ::bond::ext::gRPC::unary_call_result< ::tests::Result>>)>& cb)
+        private: static const ::bond::Metadata s_foo_metadata;
+
+        public: struct service
         {
-            Asyncfoo(context, ::bond::bonded< ::tests::Param>{request}, cb);
-        }
-        void Asyncfoo(const ::bond::bonded< ::tests::Param>& request, const std::function<void(std::shared_ptr< ::bond::ext::gRPC::unary_call_result< ::tests::Result>>)>& cb)
-        {
-            Asyncfoo(::std::make_shared< ::grpc::ClientContext>(), request, cb);
-        }
-        void Asyncfoo(const ::tests::Param& request, const std::function<void(std::shared_ptr< ::bond::ext::gRPC::unary_call_result< ::tests::Result>>)>& cb)
-        {
-            Asyncfoo(::std::make_shared< ::grpc::ClientContext>(), ::bond::bonded< ::tests::Param>{request}, cb);
-        }
+            typedef struct : ::bond::ext::grpc::reflection::MethodTemplate<Foo, ::tests::Param, ::tests::Result, &s_foo_metadata> {} foo;
+        };
 
-        ClientCore(const ClientCore&) = delete;
-        ClientCore& operator=(const ClientCore&) = delete;
+        private: typedef boost::mpl::list<> methods0;
+        private: typedef boost::mpl::push_front<methods0, service::foo>::type methods1;
 
-        ClientCore(ClientCore&&) = default;
-        ClientCore& operator=(ClientCore&&) = default;
+        public: typedef methods1::type methods;
 
-    private:
-        std::shared_ptr< ::grpc::ChannelInterface> _channel;
-        std::shared_ptr< ::bond::ext::gRPC::io_manager> _ioManager;
-        std::shared_ptr<TThreadPool> _threadPool;
-
-        const ::grpc::RpcMethod rpcmethod_foo_;
+        
     };
 
-    using Client = ClientCore< ::bond::ext::gRPC::thread_pool>;
-
-    template <typename TThreadPool>
-    class ServiceCore : public ::bond::ext::gRPC::detail::service<TThreadPool>
+    class Client : public ::bond::ext::grpc::detail::client
     {
     public:
-        ServiceCore()
+        using ::bond::ext::grpc::detail::client::client;
+
+        void Asyncfoo(const ::bond::bonded< ::tests::Param>& request, const ::std::function<void(::bond::ext::grpc::unary_call_result<::tests::Result>)>& cb, ::std::shared_ptr<::grpc::ClientContext> context = {})
         {
-            this->AddMethod("/tests.Foo/foo");
+            ::bond::ext::grpc::detail::client::dispatch(_mfoo, std::move(context), cb, request);
         }
-
-        virtual ~ServiceCore() { }
-        virtual void start(
-            ::grpc::ServerCompletionQueue* cq,
-            std::shared_ptr<TThreadPool> tp) override
+        std::future<::bond::ext::grpc::unary_call_result<::tests::Result>> Asyncfoo(const ::bond::bonded< ::tests::Param>& request, ::std::shared_ptr<::grpc::ClientContext> context = {})
         {
-            BOOST_ASSERT(cq);
-            BOOST_ASSERT(tp);
-
-            _rd_foo.emplace(
-                this,
-                0,
-                cq,
-                tp,
-                std::bind(&ServiceCore::foo, this, std::placeholders::_1));
-
-            this->queue_receive(
-                0,
-                &_rd_foo->_receivedCall->_context,
-                &_rd_foo->_receivedCall->_request,
-                &_rd_foo->_receivedCall->_responder,
-                cq,
-                &_rd_foo.get());
+            return ::bond::ext::grpc::detail::client::dispatch<::tests::Result>(_mfoo, std::move(context), request);
         }
-
-        virtual void foo(::bond::ext::gRPC::unary_call< ::bond::bonded< ::tests::Param>, ::tests::Result>) = 0;
+        void Asyncfoo(const ::tests::Param& request, const ::std::function<void(::bond::ext::grpc::unary_call_result<::tests::Result>)>& cb, ::std::shared_ptr<::grpc::ClientContext> context = {})
+        {
+            ::bond::ext::grpc::detail::client::dispatch(_mfoo, std::move(context), cb, request);
+        }
+        ::std::future<::bond::ext::grpc::unary_call_result<::tests::Result>> Asyncfoo(const ::tests::Param& request, ::std::shared_ptr<::grpc::ClientContext> context = {})
+        {
+            return ::bond::ext::grpc::detail::client::dispatch<::tests::Result>(_mfoo, std::move(context), request);
+        }
 
     private:
-        ::boost::optional< ::bond::ext::gRPC::detail::service_unary_call_data< ::bond::bonded< ::tests::Param>, ::tests::Result, TThreadPool>> _rd_foo;
+        const ::bond::ext::grpc::detail::client::Method _mfoo{ ::bond::ext::grpc::detail::client::make_method("/tests.Foo/foo") };
     };
 
-    using Service = ServiceCore< ::bond::ext::gRPC::thread_pool>;
+    class Service : public ::bond::ext::grpc::detail::service
+    {
+    public:
+        explicit Service(const ::bond::ext::grpc::Scheduler& scheduler)
+            : ::bond::ext::grpc::detail::service(
+                scheduler,
+                {
+                    "/tests.Foo/foo"
+                })
+        {}
+
+        virtual void foo(::bond::ext::grpc::unary_call<::tests::Param, ::tests::Result>) = 0;
+
+    private:
+        void start() override
+        {
+            _data.emplace(*this);
+        }
+
+        struct data
+        {
+            explicit data(Service& s)
+                : _s(s)
+            {}
+
+            Service& _s;
+            ::bond::ext::grpc::detail::service::Method _m0{ _s, 0, ::bond::ext::grpc::detail::service::make_callback(&Service::foo, _s) };
+        };
+
+        ::boost::optional<data> _data;
+    };
 };
 
-template <typename TThreadPool>
-inline Foo::ClientCore<TThreadPool>::ClientCore(
-    const std::shared_ptr< ::grpc::ChannelInterface>& channel,
-    std::shared_ptr< ::bond::ext::gRPC::io_manager> ioManager,
-    std::shared_ptr<TThreadPool> threadPool)
-    : _channel(channel)
-    , _ioManager(ioManager)
-    , _threadPool(threadPool)
-    , rpcmethod_foo_("/tests.Foo/foo", ::grpc::RpcMethod::NORMAL_RPC, channel)
-    { }
 
-template <typename TThreadPool>
-inline void Foo::ClientCore<TThreadPool>::Asyncfoo(
-    ::std::shared_ptr< ::grpc::ClientContext> context,
-    const ::bond::bonded< ::tests::Param>& request,
-    const std::function<void(std::shared_ptr< ::bond::ext::gRPC::unary_call_result< ::tests::Result>>)>& cb)
-{
-    
-    auto calldata = std::make_shared< ::bond::ext::gRPC::detail::client_unary_call_data< ::tests::Param, ::tests::Result, TThreadPool>>(
-        _channel,
-        _ioManager,
-        _threadPool,
-        context,
-        cb);
-    calldata->dispatch(rpcmethod_foo_, request);
-}
 
 
 } // namespace tests

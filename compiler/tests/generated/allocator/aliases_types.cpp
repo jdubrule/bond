@@ -1,6 +1,7 @@
 
 #include "aliases_reflection.h"
 #include <bond/core/exception.h>
+#include <unordered_map>
 
 namespace tests
 {
@@ -9,21 +10,38 @@ namespace tests
     {
     namespace EnumToWrap
     {
-        const
-        std::map<std::string, enum EnumToWrap> _name_to_value_EnumToWrap =
-            boost::assign::map_list_of<std::string, enum EnumToWrap>
-                ("anEnumValue", anEnumValue);
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+        const std::map<std::string, enum EnumToWrap> _name_to_value_EnumToWrap
+            {
+                { "anEnumValue", anEnumValue }
+            };
 
-        const
-        std::map<enum EnumToWrap, std::string> _value_to_name_EnumToWrap =
-            ::bond::reverse_map(_name_to_value_EnumToWrap);
-
+        const std::map<enum EnumToWrap, std::string> _value_to_name_EnumToWrap
+            {
+                { anEnumValue, "anEnumValue" }
+            };
+#else
+        namespace
+        {
+            struct _hash_EnumToWrap
+            {
+                std::size_t operator()(enum EnumToWrap value) const
+                {
+                    return static_cast<std::size_t>(value);
+                }
+            };
+        }
+#endif
         const std::string& ToString(enum EnumToWrap value)
         {
-            std::map<enum EnumToWrap, std::string>::const_iterator it =
-                GetValueToNameMap(value).find(value);
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+            const auto& map = GetValueToNameMap(value);
+#else
+            const auto& map = GetValueToNameMap<std::unordered_map<enum EnumToWrap, std::string, _hash_EnumToWrap> >(value);
+#endif
+            auto it = map.find(value);
 
-            if (GetValueToNameMap(value).end() == it)
+            if (map.end() == it)
                 ::bond::InvalidEnumValueException(value, "EnumToWrap");
 
             return it->second;
@@ -34,6 +52,41 @@ namespace tests
             if (!ToEnum(value, name))
                 ::bond::InvalidEnumValueException(name.c_str(), "EnumToWrap");
         }
+
+        bool ToEnum(enum EnumToWrap& value, const std::string& name)
+        {
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+            const auto& map = GetNameToValueMap(value);
+#else
+            const auto& map = GetNameToValueMap<std::unordered_map<std::string, enum EnumToWrap> >(value);
+#endif
+            auto it = map.find(name);
+
+            if (map.end() == it)
+                return false;
+
+            value = it->second;
+
+            return true;
+        }
+
+        bool FromEnum(std::string& name, enum EnumToWrap value)
+        {
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+            const auto& map = GetValueToNameMap(value);
+#else
+            const auto& map = GetValueToNameMap<std::unordered_map<enum EnumToWrap, std::string, _hash_EnumToWrap> >(value);
+#endif
+            auto it = map.find(value);
+
+            if (map.end() == it)
+                return false;
+
+            name = it->second;
+
+            return true;
+        }
+
     } // namespace EnumToWrap
     } // namespace _bond_enumerators
 

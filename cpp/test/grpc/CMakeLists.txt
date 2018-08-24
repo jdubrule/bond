@@ -4,7 +4,7 @@
 function (add_unit_test)
     get_filename_component(name ${ARGV0} NAME_WE)
     set (files ${ARGV})
-    add_bond_test (${name} EXCLUDE_FROM_ALL ${files} COMM)
+    add_bond_test (${name} EXCLUDE_FROM_ALL ${files} GRPC)
     add_target_to_folder (${name})
     add_dependencies (${name}
         bond)
@@ -33,15 +33,32 @@ add_library (grpc_test_common EXCLUDE_FROM_ALL "main.cpp")
 add_target_to_folder (grpc_test_common)
 target_include_directories (grpc_test_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}
-    # TODO: It feels like the grpc++ target should have this as part of its
-    # interface... Perhaps a patch for upstream?
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../thirdparty/grpc/include)
+    ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
 target_link_libraries (grpc_test_common PUBLIC
     ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
     grpc++)
 
+add_bond_codegen(TARGET grpc_test_services_codegen
+  services.bond
+  GRPC)
+
 add_unit_test (io_manager.cpp)
+
+add_unit_test (service_attributes.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/services_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/services_grpc.cpp")
+target_include_directories(service_attributes
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
+add_dependencies(service_attributes grpc_test_services_codegen)
+
 add_unit_test (thread_pool.cpp)
+
+add_unit_test (unary_call.cpp)
+
 add_unit_test (wait_callback.cpp)
 target_link_libraries(wait_callback PRIVATE bond_apply)
+
+add_unit_test (server.cpp)
+target_include_directories(server
+    PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
+add_dependencies(server grpc_test_services_codegen)

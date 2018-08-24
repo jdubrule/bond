@@ -1,10 +1,10 @@
 ﻿namespace Examples
 {
     using System;
-    using System.Diagnostics;
     using System.IO;
     using System.Text;
     using System.Xml;
+
     using Bond;
     using Bond.Protocols;
 
@@ -39,9 +39,14 @@
   <Variant>Complex</Variant>
 </Config>";
 
-            var reader = new SimpleXmlReader(XmlReader.Create(new StringReader(configString)));
+            var reader = new SimpleXmlReader(new StringReader(configString));
             config = Deserialize<Config>.From(reader);
-            Debug.Assert(config.Enabled == false);
+            ThrowIfFalse(config.Enabled == false);
+        }
+
+        static void ThrowIfFalse(bool b)
+        {
+            if (!b) throw new Exception("Assertion failed");
         }
     }
 }

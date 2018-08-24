@@ -6,22 +6,21 @@
 #endif
 
 #include <bond/ext/grpc/thread_pool.h>
-#include <bond/ext/detail/event.h>
 
 // TODO: move unit_test_framework.h to cpp/test/inc
 #include "../core/unit_test_framework.h"
+#include "event.h"
 
 #include <atomic>
 #include <chrono>
 #include <functional>
-#include <memory>
 #include <thread>
 
-using namespace bond::ext::detail;
+#include <boost/optional.hpp>
 
 class BasicThreadPoolTests
 {
-    static void addOne(int* i, event* sum_event)
+    static void addOne(int* i, unit_test::event* sum_event)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         (*i)++;
@@ -30,13 +29,13 @@ class BasicThreadPoolTests
 
     static void UseStdFunction()
     {
-        bond::ext::gRPC::thread_pool threads(1);
+        bond::ext::grpc::thread_pool threads;
         int sum = 0;
-        event sum_event;
+        unit_test::event sum_event;
 
-        std::function<void(int*, event*)> f_addOne = addOne;
+        std::function<void(int*, unit_test::event*)> f_addOne = addOne;
 
-        threads.schedule(std::bind(f_addOne, &sum, &sum_event));
+        threads(std::bind(f_addOne, &sum, &sum_event));
 
         bool waitResult = sum_event.wait_for(std::chrono::seconds(30));
 
@@ -46,11 +45,11 @@ class BasicThreadPoolTests
 
     static void UseLambda()
     {
-        bond::ext::gRPC::thread_pool threads(1);
+        bond::ext::grpc::thread_pool threads;
         int sum = 0;
-        event sum_event;
+        unit_test::event sum_event;
 
-        threads.schedule([&sum, &sum_event]()
+        threads([&sum, &sum_event]
         {
             ++sum;
             sum_event.set();
@@ -64,18 +63,20 @@ class BasicThreadPoolTests
 
     static void FinishAllTasksAfterDelete()
     {
-        std::unique_ptr<bond::ext::gRPC::thread_pool> threads(new bond::ext::gRPC::thread_pool(2));
-        std::atomic<int> sum(0);
+        boost::optional<bond::ext::grpc::thread_pool> threads;
+        threads.emplace();
 
-        auto increment = [&sum](){
+        std::atomic<int> sum(0);
+        auto increment = [&sum]
+        {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             sum++;
         };
 
-        threads->schedule(increment);
-        threads->schedule(increment);
-        threads->schedule(increment);
-        threads->schedule(increment);
+        (*threads)(increment);
+        (*threads)(increment);
+        (*threads)(increment);
+        (*threads)(increment);
 
         // blocks until all schedule tasks are finished
         threads.reset();

@@ -5,6 +5,7 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit (testCase)
 import Tests.Syntax
+import Tests.Syntax.JSON(methodParsingTests)
 import Tests.Codegen
 import Tests.Codegen.Util(utilTestGroup)
 
@@ -28,9 +29,11 @@ tests = testGroup "Compiler tests"
             , testCase "simple service syntax" $ compareAST "service"
             , testCase "service attributes" $ compareAST "service_attributes"
             , testCase "generic service" $ compareAST "generic_service"
+            , testCase "streaming service" $ compareAST "streaming"
             , testCase "documentation example" $ compareAST "example"
             , testCase "service inheritance" $ compareAST "service_inheritance"
             ]
+        , methodParsingTests
         ]
     , testGroup "SchemaDef"
         [ verifySchemaDef "attributes" "Foo"
@@ -79,6 +82,11 @@ tests = testGroup "Compiler tests"
                 ]
                 "with_enum_header"
             , verifyCodegen
+                 [ "c++"
+                 , "--import-dir=tests/schema/imports"
+                 ]
+                 "import"
+            , verifyCodegen
                 [ "c++"
                 , "--allocator=arena"
                 ]
@@ -116,21 +124,17 @@ tests = testGroup "Compiler tests"
                     , "--export-attribute=DllExport"
                     ]
                     "service"
+                , verifyExportsCodegen
+                    [ "c++"
+                    , "--export-attribute=DllExport"
+                    ]
+                    "with_enum_header"
                 ]
-            , testGroup "Comm"
-                [ verifyCppCommCodegen
-                    [ "c++"
-                    ]
-                    "service"
-                , verifyCppCommCodegen
-                    [ "c++"
-                    ]
-                    "generic_service"
-                , verifyCppCommCodegen
-                    [ "c++"
-                    ]
-                    "service_attributes"
+            , verifyCodegen
+                [ "c++"
+                , "--namespace=tests=nsmapped"
                 ]
+                "basic_types_nsmapped"
             , testGroup "Grpc"
                 [ verifyCppGrpcCodegen
                     [ "c++"
@@ -157,21 +161,76 @@ tests = testGroup "Compiler tests"
             , verifyCsCodegen "generics"
             , verifyCsCodegen "inheritance"
             , verifyCsCodegen "aliases"
+            , verifyCsCodegen "complex_inheritance"
+            , verifyCodegenVariation
+                [ "c#"
+                , "--preview-constructor-parameters"
+                , "--readonly-properties"
+                ]
+                "complex_inheritance"
+                "constructor-parameters"
+            , verifyCodegenVariation
+                [ "c#"
+                , "--preview-constructor-parameters"
+                , "--fields"
+                ]
+                "complex_inheritance"
+                "constructor-parameters_fields"
             , verifyCodegen
                 [ "c#"
                 , "--using=time=System.DateTime"
                 ]
                 "nullable_alias"
-            , testGroup "Comm"
-                [ verifyCsCommCodegen
+            , verifyCodegen
+                [ "c#"
+                , "--namespace=tests=nsmapped"
+                ]
+                "basic_types_nsmapped"
+            , verifyCodegen
+                 [ "c#"
+                 , "--import-dir=tests/schema/imports"
+                 ]
+                 "import"
+            , testGroup "Grpc"
+                [ verifyCsGrpcCodegen
                     [ "c#"
                     ]
                     "service"
-                , verifyCsCommCodegen
+                , verifyCsGrpcCodegen
                     [ "c#"
                     ]
                     "generic_service"
+                , verifyCsGrpcCodegen
+                    [ "c#"
+                    ]
+                    "service_attributes"
+                , verifyCsGrpcCodegen
+                    [ "c#"
+                    ]
+                    "streaming"
                 ]
+            ]
+        , testGroup "Java"
+            [ verifyJavaCodegen "attributes"
+            , verifyJavaCodegen "basic_types"
+            , verifyJavaCodegen "bond_meta"
+            , verifyJavaCodegen "complex_types"
+            , verifyJavaCodegen "defaults"
+            , verifyJavaCodegen "empty"
+            , verifyJavaCodegen "field_modifiers"
+            , verifyJavaCodegen "generics"
+            , verifyJavaCodegen "inheritance"
+            , verifyJavaCodegen "aliases"
+            , verifyCodegen
+                [ "java"
+                , "--namespace=tests=nsmapped"
+                ]
+                "basic_types_nsmapped"
+            , verifyCodegen
+                 [ "java"
+                 , "--import-dir=tests/schema/imports"
+                 ]
+                 "import"
             ]
         ]
     ]

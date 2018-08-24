@@ -3,14 +3,15 @@
 
 #pragma once
 
-#include "config.h"
-#include "protocol.h"
-#include "runtime_schema.h"
+#include <bond/core/config.h>
+
 #include "bond_fwd.h"
 #include "detail/double_pass.h"
-#include "detail/protocol_visitors.h"
 #include "detail/marshaled_bonded.h"
-
+#include "detail/protocol_visitors.h"
+#include "protocol.h"
+#include "runtime_schema.h"
+#include "select_protocol_fwd.h"
 
 namespace bond
 {
@@ -25,6 +26,25 @@ template <typename Protocols, typename Transform, typename T, typename Reader>
 typename boost::enable_if<need_double_pass<Transform>, bool>::type inline
 ApplyTransform(const Transform& transform, const bonded<T, Reader>& bonded);
 
+
+// Helper function move_data for dealing with [not] moving a Reader& in bonded<T, Reader&>
+template <typename T, typename U>
+typename boost::enable_if<std::is_reference<T>, T>::type
+inline move_data(U& data) BOND_NOEXCEPT
+{
+    BOOST_STATIC_ASSERT(std::is_same<T, U&>::value);
+    return data;
+}
+
+template <typename T, typename U>
+typename boost::disable_if<std::is_reference<T>, T&&>::type
+inline move_data(U& data) BOND_NOEXCEPT_IF(
+    std::is_nothrow_move_constructible<T>::value)
+{
+    BOOST_STATIC_ASSERT(std::is_same<T, U>::value);
+    return std::move(data);
+}
+
 } // namespace detail
 
 
@@ -33,12 +53,6 @@ is_marshaled_bonded
     : std::integral_constant<bool,
         uses_marshaled_bonded<Reader, Unused>::value
         && is_bonded<T>::value> {};
-
-
-template <typename T, typename Protocols, typename Buffer, typename Transform>
-inline std::pair<ProtocolType, bool> SelectProtocolAndApply(
-    Buffer& input,
-    const Transform& transform);
 
 
 /// @brief Represents data for a struct T known at compile-time
@@ -62,23 +76,19 @@ public:
           _base(false)
     {}
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     /// @brief Move constructor
     bonded(bonded&& bonded) BOND_NOEXCEPT_IF(
-        bond::is_nothrow_move_constructible<Reader>::value
-        && bond::is_nothrow_move_constructible<RuntimeSchema>::value)
-        : _data(std::move(bonded._data)),
+        BOND_NOEXCEPT_EXPR(detail::move_data<Reader>(bonded._data))
+        && std::is_nothrow_move_constructible<RuntimeSchema>::value)
+        : _data(detail::move_data<Reader>(bonded._data)),
           _schema(std::move(bonded._schema)),
           _skip(std::move(bonded._skip)),
           _base(std::move(bonded._base))
     {
         bonded._skip = false;
     }
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
     bonded& operator=(const bonded& rhs) = default;
-#endif
 
     /// @brief Explicit up/down-casting from/to bonded of a derived type
     template <typename U, typename ReaderT>
@@ -89,7 +99,7 @@ public:
           _skip(true),
           _base(false)
     {
-        BOOST_STATIC_ASSERT((is_base_of<U, T>::value || is_base_of<T, U>::value));
+        BOOST_STATIC_ASSERT((std::is_base_of<U, T>::value || std::is_base_of<T, U>::value));
     }
 
 
@@ -143,7 +153,7 @@ public:
     template <typename U, typename ReaderT>
     operator bonded<U, ReaderT>() const
     {
-        BOOST_STATIC_ASSERT((is_base_of<U, T>::value));
+        BOOST_STATIC_ASSERT((std::is_base_of<U, T>::value));
         return bonded<U, ReaderT>(*this);
     }
 

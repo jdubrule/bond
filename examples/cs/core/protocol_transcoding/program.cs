@@ -1,8 +1,10 @@
 ﻿namespace Examples
 {
-    using System.Diagnostics;
+    using System;
+    using System.Linq;
     using System.Text;
     using System.Xml;
+
     using Bond;
     using Bond.Protocols;
     using Bond.IO.Unsafe;
@@ -36,7 +38,7 @@
             Transcode<Example>.FromTo(reader, xmlWriter);
             xmlWriter.Flush();
 
-            Debug.Assert(xmlString.ToString() == 
+            string[] expectedLines =
 @"<Example>
   <Widgets>
     <Item>
@@ -46,7 +48,16 @@
       </Widget>
     </Item>
   </Widgets>
-</Example>");
+</Example>".Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+
+            string[] actualLines = xmlString.ToString().Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+
+            ThrowIfFalse(expectedLines.SequenceEqual(actualLines));
+        }
+
+        static void ThrowIfFalse(bool b)
+        {
+            if (!b) throw new Exception("Assertion failed");
         }
     }
 }

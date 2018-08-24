@@ -17,7 +17,7 @@ namespace tests
 {
     using System.Collections.Generic;
 
-    [System.CodeDom.Compiler.GeneratedCode("gbc", "0.10.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("gbc", "0.11.0.3")]
     public enum EnumType1
     {
         EnumValue1 = unchecked((int)5),
@@ -31,10 +31,12 @@ namespace tests
         Int32Max = unchecked((int)2147483647),
         UInt32Min = unchecked((int)0),
         UInt32Max = unchecked((int)4294967295),
+        HexNeg = unchecked((int)-255),
+        OctNeg = unchecked((int)-83),
     }
 
     [global::Bond.Schema]
-    [System.CodeDom.Compiler.GeneratedCode("gbc", "0.10.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("gbc", "0.11.0.3")]
     public partial class Foo
     {
         [global::Bond.Id(0)]
@@ -145,6 +147,12 @@ namespace tests
         [global::Bond.Id(35), global::Bond.Type(typeof(global::Bond.Tag.wstring))]
         public string m_wstr_2 { get; set; }
 
+        [global::Bond.Id(36)]
+        public long m_int64_neg_hex { get; set; }
+
+        [global::Bond.Id(37)]
+        public long m_int64_neg_oct { get; set; }
+
         public Foo()
             : this("tests.Foo", "Foo")
         {}
@@ -173,6 +181,8 @@ namespace tests
             m_enum_uint32_min = EnumType1.UInt32Min;
             m_enum_uint32_max = EnumType1.UInt32Max;
             m_wstr_1 = "default wstring value";
+            m_int64_neg_hex = -4095;
+            m_int64_neg_oct = -83;
         }
     }
 } // tests

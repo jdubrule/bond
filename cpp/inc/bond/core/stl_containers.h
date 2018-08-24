@@ -3,15 +3,19 @@
 
 #pragma once
 
-#include <boost/utility/enable_if.hpp>
-#include <stdint.h>
-#include <string>
-#include <list>
-#include <vector>
-#include <map>
-#include <set>
+#include <bond/core/config.h>
+
 #include "container_interface.h"
 #include "traits.h"
+
+#include <boost/utility/enable_if.hpp>
+
+#include <list>
+#include <map>
+#include <set>
+#include <stdint.h>
+#include <string>
+#include <vector>
 
 // Bond container interface on top of STL container classes
 
@@ -24,13 +28,13 @@ BOND_NORETURN void ElementNotFoundException(const Key& key);
 // is_string<std::basic_string<char, T, A> >
 template<typename T, typename A> struct
 is_string<std::basic_string<char, T, A> >
-    : true_type {};
+    : std::true_type {};
 
 
 // is_wstring<std::basic_string<wchar_t, T, A> >
 template<typename T, typename A> struct
 is_wstring<std::basic_string<wchar_t, T, A> >
-    : true_type {};
+    : std::true_type {};
 
 
 // is_string_type
@@ -44,31 +48,31 @@ is_string_type
 // is_list_container<std::list<T, A> >
 template <typename T, typename A> struct
 is_list_container<std::list<T, A> >
-    : true_type {};
+    : std::true_type {};
 
 
 // is_list_container<std::vector<T, A> >
 template <typename T, typename A> struct
 is_list_container<std::vector<T, A> >
-    : true_type {};
+    : std::true_type {};
 
 
 // require_modify_element<std::vector<bool, A> >
 template <typename A> struct
 require_modify_element<std::vector<bool, A> >
-    : true_type {};
+    : std::true_type {};
 
 
 // is_set_container<std::set<T, C, A> >
 template <typename T, typename C, typename A> struct
 is_set_container<std::set<T, C, A> >
-    : true_type {};
+    : std::true_type {};
 
 
 // is_map_container<std::map<K, T, C, A> >
 template <typename K, typename T, typename C, typename A> struct
 is_map_container<std::map<K, T, C, A> >
-    : true_type {};
+    : std::true_type {};
 
 
 // specialize element_type for map becuase map::value_type is pair<const K, T>
@@ -127,45 +131,17 @@ uint32_t container_size(const T& list)
 }
 
 
-template <typename T, typename Enable = void> struct
-has_key_compare
-    : false_type {};
-
-
-template <typename T> struct
-has_key_compare<T, typename boost::enable_if<is_class<typename T::key_compare> >::type>
-    : true_type {};
-
-
 // use_container_allocator_for_elements
 template <typename T, typename Enable = void> struct
 use_container_allocator_for_elements
-    : false_type {};
+    : std::false_type {};
 
-
-#if defined(BOND_NO_CXX11_ALLOCATOR)
-
-template <typename T> struct
-use_container_allocator_for_elements<T, typename boost::enable_if<
-    is_same<typename T::allocator_type::template rebind<int>::other,
-    typename element_type<T>::type::allocator_type::template rebind<int>::other> >::type>
-    : std::integral_constant<bool,
-        !detail::is_default_allocator<typename T::allocator_type>::value> {};
-
-template <typename T> struct
-use_container_allocator_for_elements<T, typename boost::enable_if_c<
-    has_schema<typename element_type<T>::type>::value
- && !detail::is_default_allocator<typename T::allocator_type>::value>::type>
-    : true_type {};
-
-#else
 
 template <typename T> struct
 use_container_allocator_for_elements<T, typename boost::enable_if_c<
     std::uses_allocator<typename element_type<T>::type, typename T::allocator_type>::value>::type>
-    : true_type {};
+    : std::true_type {};
 
-#endif
 
 // make_element
 template <typename T>
@@ -179,21 +155,10 @@ make_element(T& /*container*/)
 
 template <typename T>
 inline
-typename boost::enable_if_c<use_container_allocator_for_elements<T>::value
-                         && !has_key_compare<typename element_type<T>::type>::value, typename element_type<T>::type>::type
+typename boost::enable_if<use_container_allocator_for_elements<T>, typename element_type<T>::type>::type
 make_element(T& container)
 {
     return typename element_type<T>::type(container.get_allocator());
-}
-
-
-template <typename T>
-inline
-typename boost::enable_if_c<use_container_allocator_for_elements<T>::value
-                         && has_key_compare<typename element_type<T>::type>::value, typename element_type<T>::type>::type
-make_element(T& container)
-{
-    return typename element_type<T>::type(typename element_type<T>::type::key_compare(), container.get_allocator());
 }
 
 
@@ -261,16 +226,13 @@ void clear_map(std::map<K, T, C, A>& map)
 // use_map_allocator_for_keys
 template <typename T, typename Enable = void> struct
 use_map_allocator_for_keys
-    : false_type {};
+    : std::false_type {};
 
 
 template <typename T> struct
-use_map_allocator_for_keys
-<T, typename boost::enable_if<
-    is_same<typename detail::rebind_allocator<typename T::allocator_type, int>::type,
-    typename detail::rebind_allocator<typename element_type<T>::type::first_type::allocator_type, int>::type> >::type>
-    : std::integral_constant<bool,
-        !detail::is_default_allocator<typename T::allocator_type>::value> {};
+use_map_allocator_for_keys<T, typename boost::enable_if<
+    std::uses_allocator<typename element_type<T>::type::first_type, typename T::allocator_type> >::type>
+    : std::true_type {};
 
 
 // make_key
@@ -295,33 +257,14 @@ make_key(T& map)
 // use_map_allocator_for_values
 template <typename T, typename Enable = void> struct
 use_map_allocator_for_values
-    : false_type {};
+    : std::false_type {};
 
-
-#if defined(BOND_NO_CXX11_ALLOCATOR)
 
 template <typename T> struct
 use_map_allocator_for_values<T, typename boost::enable_if<
-    is_same<typename T::allocator_type::template rebind<int>::other,
-    typename element_type<T>::type::second_type::allocator_type::template rebind<int>::other> >::type>
-    : std::integral_constant<bool,
-        !detail::is_default_allocator<typename T::allocator_type>::value> {};
+    std::uses_allocator<typename element_type<T>::type::second_type, typename T::allocator_type> >::type>
+    : std::true_type {};
 
-template <typename T> struct
-use_map_allocator_for_values<T, typename boost::enable_if_c<
-    has_schema<typename element_type<T>::type::second_type>::value
- && !detail::is_default_allocator<typename T::allocator_type>::value>::type>
-    : true_type {};
-
-#else
-
-template <typename T> struct
-use_map_allocator_for_values<T, typename boost::enable_if_c<
-    std::uses_allocator<typename element_type<T>::type::second_type,
-    typename T::allocator_type>::value>::type>
-    : true_type {};
-
-#endif
 
 // make_value
 template <typename T>
@@ -336,23 +279,10 @@ make_value(T& /*map*/)
 
 template <typename T>
 inline
-typename boost::enable_if_c<use_map_allocator_for_values<T>::value
-                         && !has_key_compare<typename element_type<T>::type::second_type>::value,
-    typename element_type<T>::type::second_type>::type
+typename boost::enable_if<use_map_allocator_for_values<T>, typename element_type<T>::type::second_type>::type
 make_value(T& map)
 {
     return typename element_type<T>::type::second_type(map.get_allocator());
-}
-
-
-template <typename T>
-inline
-typename boost::enable_if_c<use_map_allocator_for_values<T>::value
-                         && has_key_compare<typename element_type<T>::type::second_type>::value,
-    typename element_type<T>::type::second_type>::type
-make_value(T& map)
-{
-    return typename element_type<T>::type::second_type(typename element_type<T>::type::second_type::key_compare(), map.get_allocator());
 }
 
 

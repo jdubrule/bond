@@ -7,12 +7,12 @@
     #pragma warning(disable : 4505) // disable "unreferenced local function has been removed" warning
 #endif
 
-#include <grpc++/grpc++.h>
-#include <grpc++/alarm.h>
-#include <grpc++/impl/codegen/completion_queue.h>
-#include <grpc++/impl/grpc_library.h>
 #include <grpc/grpc.h>
 #include <grpc/support/time.h>
+#include <grpcpp/alarm.h>
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/impl/codegen/completion_queue.h>
+#include <grpcpp/impl/grpc_library.h>
 
 #ifdef _MSC_VER
     #pragma warning(pop)
@@ -20,12 +20,12 @@
 
 #include <bond/ext/grpc/io_manager.h>
 #include <bond/ext/grpc/detail/io_manager_tag.h>
-#include <bond/ext/detail/countdown_event.h>
-#include <bond/ext/detail/barrier.h>
-#include <bond/ext/detail/event.h>
 
 // TODO: move unit_test_framework.h to cpp/test/inc
 #include "../core/unit_test_framework.h"
+#include "barrier.h"
+#include "countdown_event.h"
+#include "event.h"
 
 #include <boost/chrono.hpp>
 #include <boost/test/debug.hpp>
@@ -33,9 +33,8 @@
 #include <memory>
 #include <utility>
 
-using namespace bond::ext::detail;
-using namespace bond::ext::gRPC::detail;
-using namespace bond::ext::gRPC;
+using namespace bond::ext::grpc::detail;
+using namespace bond::ext::grpc;
 
 template <typename TEvent>
 struct alarm_completion_tag : io_manager_tag
@@ -59,9 +58,9 @@ class io_managerTests
     {
         io_manager ioManager;
 
-        alarm_completion_tag<event> act;
+        alarm_completion_tag<unit_test::event> act;
         gpr_timespec deadline = gpr_time_0(GPR_CLOCK_MONOTONIC);
-        grpc::Alarm alarm(ioManager.cq(), deadline, &act);
+        ::grpc::Alarm alarm(ioManager.cq(), deadline, act.tag());
 
         bool wasSet = act.completion_event.wait_for(std::chrono::seconds(30));
         UT_AssertIsTrue(wasSet);
@@ -73,15 +72,15 @@ class io_managerTests
 
         const size_t numItems = 1000;
 
-        alarm_completion_tag<countdown_event> act(numItems);
+        alarm_completion_tag<unit_test::countdown_event> act(numItems);
 
         const gpr_timespec deadline = gpr_time_0(GPR_CLOCK_MONOTONIC);
 
-        std::vector<grpc::Alarm> alarms;
+        std::vector<::grpc::Alarm> alarms;
         alarms.reserve(numItems);
         for (size_t i = 0; i < numItems; ++i)
         {
-            alarms.emplace_back(ioManager.cq(), deadline, &act);
+            alarms.emplace_back(ioManager.cq(), deadline, act.tag());
         }
 
         bool wasSet = act.completion_event.wait_for(std::chrono::seconds(30));
@@ -90,9 +89,7 @@ class io_managerTests
 
     static void ShutdownUnstarted()
     {
-        io_manager ioManager(
-            io_manager::USE_HARDWARE_CONC,
-            io_manager::delay_start_tag{});
+        io_manager ioManager(1, true);
         ioManager.shutdown();
         ioManager.wait();
 
@@ -102,12 +99,14 @@ class io_managerTests
     static void ConcurrentShutdown()
     {
         io_manager ioManager(
+            1,
+            false,
             // also tests that we can pass an explicit completion queue
-            std::unique_ptr<grpc::CompletionQueue>(new grpc::CompletionQueue));
+            std::unique_ptr<::grpc::CompletionQueue>(new ::grpc::CompletionQueue));
 
         const size_t numConcurrentShutdowns = 5;
-        barrier threadsStarted(numConcurrentShutdowns);
-        barrier threadsObservedShutdown(numConcurrentShutdowns);
+        unit_test::barrier threadsStarted(numConcurrentShutdowns);
+        unit_test::barrier threadsObservedShutdown(numConcurrentShutdowns);
 
         std::vector<std::thread> threads;
         threads.reserve(5);
@@ -139,14 +138,14 @@ class io_managerTests
     static void DelayStartDoesntStart()
     {
         io_manager ioManager(
+            1,
+            true,
             // also tests that we can pass an explicit completion queue
-            std::unique_ptr<grpc::CompletionQueue>(new grpc::CompletionQueue),
-            io_manager::USE_HARDWARE_CONC,
-            io_manager::delay_start_tag{});
+            std::unique_ptr<::grpc::CompletionQueue>(new ::grpc::CompletionQueue));
 
-        alarm_completion_tag<event> act;
+        alarm_completion_tag<unit_test::event> act;
         gpr_timespec deadline = gpr_time_0(GPR_CLOCK_MONOTONIC);
-        grpc::Alarm alarm(ioManager.cq(), deadline, &act);
+        ::grpc::Alarm alarm(ioManager.cq(), deadline, act.tag());
 
         bool wasSet = act.completion_event.wait_for(std::chrono::milliseconds(1250));
         UT_AssertIsTrue(!wasSet);
@@ -176,14 +175,6 @@ public:
 
 bool init_unit_test()
 {
-    // grpc allocates a bunch of stuff on-demand caused the leak tracker to
-    // report leaks. Disable it for this test.
-    boost::debug::detect_memory_leaks(false);
-
-    // Initialize the gRPC++ library
-    grpc::internal::GrpcLibraryInitializer initializer;
-    initializer.summon();
-
     io_managerTests::Initialize();
     return true;
 }

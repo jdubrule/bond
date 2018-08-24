@@ -4,11 +4,16 @@
 /** @file */
 #pragma once
 
+#include <bond/core/config.h>
+
 #include <bond/core/blob.h>
 #include <bond/core/containers.h>
+#include <bond/core/detail/checked.h>
 #include <bond/core/traits.h>
 #include <boost/static_assert.hpp>
 #include <cstring>
+#include <limits>
+#include <stdexcept>
 
 namespace bond
 {
@@ -139,11 +144,12 @@ public:
     }
 
 
-    /// @brief Get content of the stream as a vector of memory blobs
+    /// @brief Get content of the stream as a collection of memory blobs
+    /// @remarks The provided collection must have reserve, assign and emplace_back functions
     template <typename T>
-    void GetBuffers(std::vector<blob, T>& buffers) const
+    void GetBuffers(T& buffers) const
     {
-        buffers.reserve(_blobs.size() + 1);
+        buffers.reserve(bond::detail::checked_add(_blobs.size(), 1U));
 
         //
         // insert all "ready" blobs
@@ -156,7 +162,7 @@ public:
             // attach current array, if not empty,
             // as a last blob
             //
-            buffers.push_back(blob(_buffer, _rangeOffset, _rangeSize));
+            buffers.emplace_back(_buffer, _rangeOffset, _rangeSize);
         }
     }
 
@@ -243,7 +249,13 @@ public:
             //
             if (_rangeSize > 0)
             {
-                _blobs.push_back(blob(_buffer, _rangeOffset, _rangeSize));
+                _blobs.emplace_back(_buffer, _rangeOffset, _rangeSize);
+            }
+
+            // cap buffer to prevent overflow
+            if (_bufferSize > ((std::numeric_limits<uint32_t>::max)() >> 1))
+            {
+                throw std::bad_alloc();
             }
 
             //
@@ -286,7 +298,7 @@ public:
         //
         if (_rangeSize > 0)
         {
-            _blobs.push_back(blob(_buffer, _rangeOffset, _rangeSize));
+            _blobs.emplace_back(_buffer, _rangeOffset, _rangeSize);
 
             _rangeOffset += _rangeSize;
             _rangePtr += _rangeSize;
@@ -350,7 +362,7 @@ protected:
     char* _rangePtr;
 
     // list of blobs
-    std::vector<blob, typename detail::rebind_allocator<A, blob>::type> _blobs;
+    std::vector<blob, typename std::allocator_traits<A>::template rebind_alloc<blob> > _blobs;
 
 
     friend OutputMemoryStream CreateOutputBuffer(const OutputMemoryStream& other)

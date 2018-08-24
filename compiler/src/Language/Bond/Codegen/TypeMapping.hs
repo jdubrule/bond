@@ -23,8 +23,11 @@ module Language.Bond.Codegen.TypeMapping
     , idlTypeMapping
     , cppTypeMapping
     , cppCustomAllocTypeMapping
+    , cppExpandAliasesTypeMapping
     , csTypeMapping
     , csCollectionInterfacesTypeMapping
+    , javaTypeMapping
+    , javaBoxedTypeMapping
       -- * Alias mapping
       --
       -- | <https://microsoft.github.io/bond/manual/compiler.html#type-aliases Type aliases>
@@ -42,6 +45,7 @@ module Language.Bond.Codegen.TypeMapping
       -- * Name builders
     , getTypeName
     , getInstanceTypeName
+    , getElementTypeName
     , getAnnotatedTypeName
     , getDeclTypeName
     , getQualifiedName
@@ -52,6 +56,7 @@ module Language.Bond.Codegen.TypeMapping
       -- * TypeMapping helper functions
     , elementTypeName
     , aliasTypeName
+    , getAliasDeclTypeName
     , declTypeName
     , declQualifiedTypeName
     ) where
@@ -119,11 +124,20 @@ getTypeName c t = fix' $ runReader (typeName t) c
   where
     fix' = fixSyntax $ typeMapping c
 
+getAliasDeclTypeName :: MappingContext -> Declaration -> Builder
+getAliasDeclTypeName c d = fix' $ runReader (aliasDeclTypeName d) c
+  where
+    fix' = fixSyntax $ typeMapping c
+
 -- | Builds the name to be used when instantiating a 'Type'. The instance type
 -- name may be different than the type name returned by 'getTypeName' when the
 -- latter is an interface.
 getInstanceTypeName :: MappingContext -> Type -> Builder
 getInstanceTypeName c t = runReader (instanceTypeName t) c
+
+-- | Builds the name to be used when instantiating an element 'Type'.
+getElementTypeName :: MappingContext -> Type -> Builder
+getElementTypeName c t = runReader (elementTypeName t) c
 
 -- | Builds the annotated name of a 'Type'. The type annotations are used to
 -- express type information about a Bond type that doesn't directly map to
@@ -162,16 +176,24 @@ cppTypeMapping = TypeMapping
     cppTypeMapping
 
 -- | C++ type name mapping using a custom allocator.
-cppCustomAllocTypeMapping :: ToText a => a -> TypeMapping
-cppCustomAllocTypeMapping alloc = TypeMapping
+cppCustomAllocTypeMapping :: ToText a => Bool -> a -> TypeMapping
+cppCustomAllocTypeMapping scoped alloc = TypeMapping
     (Just Cpp)
     "::"
     "::"
-    (cppTypeCustomAlloc $ toText alloc)
+    (cppTypeCustomAlloc scoped $ toText alloc)
     cppSyntaxFix
-    (cppCustomAllocTypeMapping alloc)
-    (cppCustomAllocTypeMapping alloc)
-    (cppCustomAllocTypeMapping alloc)
+    (cppCustomAllocTypeMapping scoped alloc)
+    (cppCustomAllocTypeMapping scoped alloc)
+    (cppCustomAllocTypeMapping scoped alloc)
+
+cppExpandAliasesTypeMapping :: TypeMapping -> TypeMapping
+cppExpandAliasesTypeMapping m = m
+    { mapType = cppTypeExpandAliases $ mapType m
+    , instanceMapping = cppExpandAliasesTypeMapping $ instanceMapping m
+    , elementMapping = cppExpandAliasesTypeMapping $ elementMapping m
+    , annotatedMapping = cppExpandAliasesTypeMapping $ annotatedMapping m
+    }
 
 -- | The default C# type name mapping.
 csTypeMapping :: TypeMapping
@@ -212,6 +234,30 @@ csAnnotatedTypeMapping = TypeMapping
     csAnnotatedTypeMapping
     csAnnotatedTypeMapping
 
+-- | The default Java type name mapping.
+javaTypeMapping :: TypeMapping
+javaTypeMapping = TypeMapping
+    (Just Java)
+    ""
+    "."
+    javaType
+    id
+    javaTypeMapping
+    javaBoxedTypeMapping
+    javaTypeMapping
+
+-- | Java type mapping that boxes all primitives.
+javaBoxedTypeMapping :: TypeMapping
+javaBoxedTypeMapping = TypeMapping
+    (Just Java)
+    ""
+    "."
+    javaBoxedType
+    id
+    javaTypeMapping
+    javaBoxedTypeMapping
+    javaTypeMapping
+
 infixr 6 <<>>
 
 (<<>>) :: (Monoid r, Monad m) => m r -> m r -> m r
@@ -243,7 +289,7 @@ typeName t = do
 localWith :: (TypeMapping -> TypeMapping) -> TypeNameBuilder -> TypeNameBuilder
 localWith f = local $ \c -> c { typeMapping = f $ typeMapping c }
 
--- | Builder for nested element types (e.g. list elements) in context of 'TypeNameBuilder' monad. 
+-- | Builder for nested element types (e.g. list elements) in context of 'TypeNameBuilder' monad.
 -- Used to implement 'mapType' function of 'TypeMapping'.
 elementTypeName :: Type -> TypeNameBuilder
 elementTypeName = localWith elementMapping . typeName
@@ -303,6 +349,28 @@ aliasTypeName a args = do
     fragment (Fragment s) = pureText s
     fragment (Placeholder i) = typeName $ args !! i
 
+aliasDeclTypeName :: Declaration -> TypeNameBuilder
+aliasDeclTypeName a@Alias {..} = do
+    ctx <- ask
+    case findAliasMapping ctx a of
+        Just AliasMapping {..} -> foldr ((<<>>) . fragment) (pure mempty) aliasTemplate
+        Nothing -> typeName aliasType
+  where
+    fragment (Fragment s) = pureText s
+    fragment (Placeholder i) = pureText $ paramName $ declParams !! i
+aliasDeclTypeName _ = error "aliasDeclTypeName: impossible happened."
+
+-- | Builder for the type alias element name in context of 'TypeNameBuilder' monad.
+aliasElementTypeName :: Declaration -> [Type] -> TypeNameBuilder
+aliasElementTypeName a args = do
+    ctx <- ask
+    case findAliasMapping ctx a of
+        Just AliasMapping {..} -> foldr ((<<>>) . fragment) (pure mempty) aliasTemplate
+        Nothing -> elementTypeName $ resolveAlias a args
+  where
+    fragment (Fragment s) = pureText s
+    fragment (Placeholder i) = elementTypeName $ args !! i
+
 -- IDL type mapping
 idlType :: Type -> TypeNameBuilder
 idlType BT_Int8 = pure "int8"
@@ -360,33 +428,36 @@ cppType (BT_Set element) = "std::set<" <>> elementTypeName element <<> ">"
 cppType (BT_Map key value) = "std::map<" <>> elementTypeName key <<>> ", " <>> elementTypeName value <<> ">"
 cppType (BT_Bonded type_) = "::bond::bonded<" <>> elementTypeName type_ <<> ">"
 cppType (BT_TypeParam param) = pureText $ paramName param
-cppType (BT_UserDefined a@Alias {..} args) = aliasTypeName a args
 cppType (BT_UserDefined decl args) = declQualifiedTypeName decl <<>> (angles <$> commaSepTypeNames args)
 
 -- C++ type mapping with custom allocator
-cppTypeCustomAlloc :: Builder -> Type -> TypeNameBuilder
-cppTypeCustomAlloc alloc BT_String = pure $ "std::basic_string<char, std::char_traits<char>, typename " <> alloc <> "::rebind<char>::other>"
-cppTypeCustomAlloc alloc BT_WString = pure $ "std::basic_string<wchar_t, std::char_traits<wchar_t>, typename " <> alloc <>  "::rebind<wchar_t>::other>"
-cppTypeCustomAlloc alloc BT_MetaName = cppTypeCustomAlloc alloc BT_String
-cppTypeCustomAlloc alloc BT_MetaFullName = cppTypeCustomAlloc alloc BT_String
-cppTypeCustomAlloc alloc (BT_List element) = "std::list<" <>> elementTypeName element <<>> ", " <>> allocator alloc element <<> ">"
-cppTypeCustomAlloc alloc (BT_Nullable element) | isStruct element = "::bond::nullable<" <>> elementTypeName element <<> ", " <> alloc <> ">"
-cppTypeCustomAlloc _lloc (BT_Nullable element) = "::bond::nullable<" <>> elementTypeName element <<> ">"
-cppTypeCustomAlloc alloc (BT_Vector element) = "std::vector<" <>> elementTypeName element <<>> ", " <>> allocator alloc element <<> ">"
-cppTypeCustomAlloc alloc (BT_Set element) = "std::set<" <>> elementTypeName element <<>> comparer element <<>> allocator alloc element <<> ">"
-cppTypeCustomAlloc alloc (BT_Map key value) = "std::map<" <>> elementTypeName key <<>> ", " <>> elementTypeName value <<>> comparer key <<>> pairAllocator alloc key value <<> ">"
-cppTypeCustomAlloc _ t = cppType t
+cppTypeCustomAlloc :: Bool -> Builder -> Type -> TypeNameBuilder
+cppTypeCustomAlloc scoped alloc BT_String = "std::basic_string<char, std::char_traits<char>, " <>> rebindAllocator scoped alloc (pure "char") <<> " >"
+cppTypeCustomAlloc scoped alloc BT_WString = "std::basic_string<wchar_t, std::char_traits<wchar_t>, " <>> rebindAllocator scoped alloc (pure "wchar_t") <<> " >"
+cppTypeCustomAlloc scoped alloc BT_MetaName = cppTypeCustomAlloc scoped alloc BT_String
+cppTypeCustomAlloc scoped alloc BT_MetaFullName = cppTypeCustomAlloc scoped alloc BT_String
+cppTypeCustomAlloc scoped alloc (BT_List element) = "std::list<" <>> elementTypeName element <<>> ", " <>> allocator scoped alloc element <<> ">"
+cppTypeCustomAlloc scoped alloc (BT_Vector element) = "std::vector<" <>> elementTypeName element <<>> ", " <>> allocator scoped alloc element <<> ">"
+cppTypeCustomAlloc scoped alloc (BT_Set element) = "std::set<" <>> elementTypeName element <<>> comparer element <<>> allocator scoped alloc element <<> ">"
+cppTypeCustomAlloc scoped alloc (BT_Map key value) = "std::map<" <>> elementTypeName key <<>> ", " <>> elementTypeName value <<>> comparer key <<>> pairAllocator scoped alloc key value <<> ">"
+cppTypeCustomAlloc _ _ t = cppType t
+
+cppTypeExpandAliases :: (Type -> TypeNameBuilder) -> Type -> TypeNameBuilder
+cppTypeExpandAliases _ (BT_UserDefined a@Alias {..} args) = aliasTypeName a args
+cppTypeExpandAliases m t = m t
 
 comparer :: Type -> TypeNameBuilder
 comparer t = ", std::less<" <>> elementTypeName t <<> ">, "
 
-allocator :: Builder -> Type -> TypeNameBuilder
-allocator alloc element =
-    "typename " <>> alloc <>> "::rebind<" <>> elementTypeName element <<> ">::other"
+rebindAllocator :: Bool -> Builder -> TypeNameBuilder -> TypeNameBuilder
+rebindAllocator False alloc element = "typename std::allocator_traits<" <>> alloc <>> ">::template rebind_alloc<" <>> element <<> ">"
+rebindAllocator True alloc element = "std::scoped_allocator_adaptor<" <>> rebindAllocator False alloc element <<> " >"
 
-pairAllocator :: Builder -> Type -> Type -> TypeNameBuilder
-pairAllocator alloc key value =
-    "typename " <>> alloc <>> "::rebind<" <>> "std::pair<const " <>> elementTypeName key <<>> ", " <>> elementTypeName value <<> "> >::other"
+allocator :: Bool -> Builder -> Type -> TypeNameBuilder
+allocator scoped alloc element = rebindAllocator scoped alloc $ elementTypeName element
+
+pairAllocator :: Bool -> Builder -> Type -> Type -> TypeNameBuilder
+pairAllocator scoped alloc key value = rebindAllocator scoped alloc $ "std::pair<const " <>> elementTypeName key <<>> ", " <>> elementTypeName value <<> "> "
 
 cppSyntaxFix :: Builder -> Builder
 cppSyntaxFix = fromLazyText . snd . L.foldr fixInvalid (' ', mempty) . toLazyText
@@ -450,4 +521,64 @@ csTypeAnnotation m t@(BT_UserDefined a@Alias {..} args)
    | otherwise = typeName $ resolveAlias a args
 csTypeAnnotation _ (BT_UserDefined decl args) = declTypeName decl <<>> (angles <$> commaSepTypeNames args)
 csTypeAnnotation m t = m t
+
+
+-- Java type mapping
+javaType :: Type -> TypeNameBuilder
+javaType BT_Int8 = pure "byte"
+javaType BT_Int16 = pure "short"
+javaType BT_Int32 = pure "int"
+javaType BT_Int64 = pure "long"
+javaType BT_UInt8 = pure "byte"
+javaType BT_UInt16 = pure "short"
+javaType BT_UInt32 = pure "int"
+javaType BT_UInt64 = pure "long"
+javaType BT_Float = pure "float"
+javaType BT_Double = pure "double"
+javaType BT_Bool = pure "boolean"
+javaType BT_String = pure "java.lang.String"
+javaType BT_WString = pure "java.lang.String"
+javaType BT_MetaName = pure "java.lang.String"
+javaType BT_MetaFullName = pure "java.lang.String"
+javaType BT_Blob = pure "org.bondlib.Blob"
+javaType (BT_IntTypeArg x) = pureText x
+javaType (BT_Maybe BT_Int8) = pure "org.bondlib.SomethingByte"
+javaType (BT_Maybe BT_Int16) = pure "org.bondlib.SomethingShort"
+javaType (BT_Maybe BT_Int32) = pure "org.bondlib.SomethingInteger"
+javaType (BT_Maybe BT_Int64) = pure "org.bondlib.SomethingLong"
+javaType (BT_Maybe BT_UInt8) = pure "org.bondlib.SomethingByte"
+javaType (BT_Maybe BT_UInt16) = pure "org.bondlib.SomethingShort"
+javaType (BT_Maybe BT_UInt32) = pure "org.bondlib.SomethingInteger"
+javaType (BT_Maybe BT_UInt64) = pure "org.bondlib.SomethingLong"
+javaType (BT_Maybe BT_Float) = pure "org.bondlib.SomethingFloat"
+javaType (BT_Maybe BT_Double) = pure "org.bondlib.SomethingDouble"
+javaType (BT_Maybe BT_Bool) = pure "org.bondlib.SomethingBoolean"
+javaType (BT_UserDefined a@Alias {} args) = javaType (resolveAlias a args)
+javaType (BT_Maybe (BT_UserDefined a@Alias {} args)) = javaType (BT_Maybe (resolveAlias a args))
+javaType (BT_Maybe fieldType) = "org.bondlib.SomethingObject<" <>> javaBoxedType fieldType <<> ">"
+javaType (BT_Nullable elementType) = javaBoxedType elementType
+javaType (BT_List elementType) = "java.util.List<" <>> elementTypeName elementType <<> ">"
+javaType (BT_Vector elementType) = "java.util.List<" <>> elementTypeName elementType <<> ">"
+javaType (BT_Set elementType) = "java.util.Set<" <>> elementTypeName elementType <<> ">"
+javaType (BT_Map keyType valueType) = "java.util.Map<" <>> elementTypeName keyType <<>> ", " <>> elementTypeName valueType <<> ">"
+javaType (BT_TypeParam param) = pureText $ paramName param
+javaType (BT_Bonded structType) = "org.bondlib.Bonded<" <>> javaBoxedType structType <<> ">"
+javaType (BT_UserDefined decl args) =
+    declQualifiedTypeName decl <<>> (angles <$> localWith (const javaBoxedTypeMapping) (commaSepTypeNames args))
+
+-- Java type mapping to a reference type with primitive types boxed
+javaBoxedType :: Type -> TypeNameBuilder
+javaBoxedType BT_Int8 = pure "java.lang.Byte"
+javaBoxedType BT_Int16 = pure "java.lang.Short"
+javaBoxedType BT_Int32 = pure "java.lang.Integer"
+javaBoxedType BT_Int64 = pure "java.lang.Long"
+javaBoxedType BT_UInt8 = pure "java.lang.Byte"
+javaBoxedType BT_UInt16 = pure "java.lang.Short"
+javaBoxedType BT_UInt32 = pure "java.lang.Integer"
+javaBoxedType BT_UInt64 = pure "java.lang.Long"
+javaBoxedType BT_Float = pure "java.lang.Float"
+javaBoxedType BT_Double = pure "java.lang.Double"
+javaBoxedType BT_Bool = pure "java.lang.Boolean"
+javaBoxedType (BT_UserDefined a@Alias {} args) = aliasElementTypeName a args
+javaBoxedType t = javaType t
 

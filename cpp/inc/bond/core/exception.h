@@ -3,8 +3,12 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
 #include "detail/string_stream.h"
+
 #include <bond/core/bond_types.h>
+
 #include <boost/locale/encoding_utf.hpp>
 #include <boost/utility/enable_if.hpp>
 
@@ -13,9 +17,7 @@
 namespace bond
 {
 
-//
-// Base type for all bond exceptions.
-//
+/// @brief Base type for all Bond exceptions.
 class Exception
     : public std::exception,
       public SerializableExceptionBase
@@ -40,6 +42,8 @@ protected:
 };
 
 
+/// @brief %Exception used to indicate an error during serialization or
+/// deserialization.
 struct CoreException
     : Exception
 {

@@ -3,8 +3,11 @@
 
 #pragma once
 
-#include "encoding.h"
+#include <bond/core/config.h>
+
 #include "detail/rapidjson_helper.h"
+#include "encoding.h"
+
 #include <bond/core/transforms.h>
 
 namespace bond
@@ -34,6 +37,7 @@ public:
         : rapidjson::Writer<detail::RapidJsonOutputStream<BufferT> >(_stream),
           _stream(output),
           _output(output),
+          _count(0),
           _level(0),
           _indent((std::min)(indent, 8)),
           _pretty(pretty),
@@ -103,7 +107,7 @@ public:
     }
 
     template <typename T>
-    typename boost::enable_if<is_unsigned<T> >::type
+    typename boost::enable_if<std::is_unsigned<T> >::type
     Write(T value)
     {
         this->WriteUint64(value);
@@ -115,7 +119,7 @@ public:
     }
 
     template <typename T>
-    typename boost::enable_if<is_enum<T> >::type
+    typename boost::enable_if<std::is_enum<T> >::type
     Write(const T& value)
     {
         this->WriteInt(static_cast<int>(value));
@@ -223,7 +227,7 @@ private:
 
 template <typename Buffer> struct 
 is_writer<SimpleJsonWriter<Buffer>, void>
-    : true_type {};
+    : std::true_type {};
 
 
 template <typename Buffer, typename Protocols>
@@ -452,10 +456,10 @@ private:
     {
         _output.WriteOpen('[');
 
-        for (uint32_t i = 0; i < value.size(); ++i)
+        for (const char& ch : value)
         {
             _output.WriteSeparator();
-            _output.Write(static_cast<int8_t>(value.content()[i]));
+            _output.Write(static_cast<int8_t>(ch));
         }
 
         _output.WriteClose(']');

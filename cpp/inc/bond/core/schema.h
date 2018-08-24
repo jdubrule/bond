@@ -3,12 +3,19 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
+#include "detail/once.h"
+#include "detail/tags.h"
 #include "reflection.h"
 #include "runtime_schema.h"
-#include "detail/tags.h"
-#include "detail/once.h"
-#include <boost/make_shared.hpp>
+
 #include <boost/bind.hpp>
+#include <boost/make_shared.hpp>
+
+#include <limits>
+#include <algorithm>
+#include <iterator>
 
 namespace bond
 {
@@ -258,16 +265,26 @@ private:
     template <typename T>
     uint16_t GetStructDef() const
     {
-        size_t n;
+        const auto& structs = _schema.structs;
 
-        for (n = 0; n < _schema.structs.size(); ++n)
-            if (_schema.structs[n].metadata.qualified_name == schema<T>::type::metadata.qualified_name)
-                return static_cast<uint16_t>(n);
+        BOOST_ASSERT(structs.size() <= (std::numeric_limits<uint16_t>::max)());
 
-        detail::SchemaCache<T>::AppendStructDef(&_schema);
+        auto it = std::find_if(
+            std::begin(structs),
+            std::end(structs),
+            [](const StructDef& def)
+            {
+                return def.metadata.qualified_name == schema<T>::type::metadata.qualified_name;
+            });
 
-        BOOST_ASSERT(n == static_cast<uint16_t>(n));
-        return static_cast<uint16_t>(n);
+        const auto index = static_cast<uint16_t>(std::distance(std::begin(structs), it));
+
+        if (it == std::end(structs))
+        {
+            detail::SchemaCache<T>::AppendStructDef(&_schema);
+        }
+
+        return index;
     }
 
 
@@ -337,8 +354,10 @@ inline RuntimeSchema key_schema(const RuntimeSchema& schema)
 }
 
 
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+
 /// @brief Returns a const reference to a map of values for a user defined enum
-template<typename T>
+template <typename T>
 inline const std::map<T, std::string>& GetEnumValues()
 {
     return GetValueToNameMap(T());
@@ -346,11 +365,29 @@ inline const std::map<T, std::string>& GetEnumValues()
 
 
 /// @brief Returns a const reference to a map of names for a user defined enum
-template<typename T>
+template <typename T>
 inline const std::map<std::string, T>& GetEnumNames()
 {
     return GetNameToValueMap(T());
 }
 
+#else
+
+/// @brief Returns a const reference to a map of values for a user defined enum
+template <typename T, typename Map = std::map<T, std::string> >
+inline const Map& GetEnumValues()
+{
+    return GetValueToNameMap(T{}, detail::mpl::identity<Map>{});
+}
+
+
+/// @brief Returns a const reference to a map of names for a user defined enum
+template <typename T, typename Map = std::map<std::string, T> >
+inline const Map& GetEnumNames()
+{
+    return GetNameToValueMap(T{}, detail::mpl::identity<Map>{});
+}
+
+#endif
 
 } // namespace bond

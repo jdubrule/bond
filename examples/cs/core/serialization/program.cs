@@ -1,7 +1,7 @@
 ﻿namespace Examples
 {
-    using System.Collections.Generic;
-    using System.Diagnostics;
+    using System;
+
     using Bond;
     using Bond.Protocols;
     using Bond.IO.Unsafe;
@@ -16,7 +16,7 @@
             {
                 n = 0x1000,
                 str = "test",
-                items = new List<double> { 3.14, 0}
+                items = { 3.14, 0 }
             };
 
             // OutputBuffer implements the Bond output stream interface on top
@@ -42,7 +42,12 @@
             var reader = new CompactBinaryReader<InputBuffer>(input);
 
             var obj2 = Deserialize<Struct>.From(reader);
-            Debug.Assert(Comparer.Equal(obj, obj2));
+            ThrowIfFalse(Comparer.Equal(obj, obj2));
+        }
+
+        static void ThrowIfFalse(bool b)
+        {
+            if (!b) throw new Exception("Assertion failed");
         }
     }
 }

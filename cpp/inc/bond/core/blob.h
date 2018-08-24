@@ -4,10 +4,14 @@
 /** @file */
 #pragma once
 
-#include "config.h"
+#include <bond/core/config.h>
+
 #include "container_interface.h"
-#include <boost/shared_array.hpp>
+#include "detail/checked.h"
+
 #include <boost/make_shared.hpp>
+#include <boost/shared_array.hpp>
+
 #include <stdint.h>
 #include <cstring>
 
@@ -38,6 +42,7 @@ public:
           _content(static_cast<const char*>(content)),
           _length(length)
     {
+        bond::detail::checked_add(_content, length);
     }
 
     /// @brief Construct from a boost::shared_ptr to const memory buffer
@@ -46,14 +51,16 @@ public:
           _content(_buffer.get()),
           _length(length)
     {
+        bond::detail::checked_add(_content, length);
     }
 
     /// @brief Construct from a boost::shared_ptr to const memory buffer
     blob(const boost::shared_ptr<const char[]>& buffer, uint32_t offset, uint32_t length)
         : _buffer(buffer),
-          _content(_buffer.get() + offset),
+          _content(bond::detail::checked_add(_buffer.get(), offset)),
           _length(length)
     {
+        bond::detail::checked_add(_content, length);
     }
 
     /// @brief Construct from a boost::shared_ptr to memory buffer
@@ -62,14 +69,16 @@ public:
           _content(_buffer.get()),
           _length(length)
     {
+        bond::detail::checked_add(_content, length);
     }
 
     /// @brief Construct from a boost::shared_ptr to memory buffer
     blob(const boost::shared_ptr<char[]>& buffer, uint32_t offset, uint32_t length)
         : _buffer(buffer),
-          _content(_buffer.get() + offset),
+          _content(bond::detail::checked_add(_buffer.get(), offset)),
           _length(length)
     {
+        bond::detail::checked_add(_content, length);
     }
 
     /// @brief Construct from a smart pointer other than boost::shared_ptr
@@ -81,6 +90,7 @@ public:
           _content(_buffer.get()),
           _length(length)
     {
+        bond::detail::checked_add(_content, length);
     }
 
     /// @brief Construct from a smart pointer other than boost::shared_ptr
@@ -89,15 +99,15 @@ public:
     template <typename T, template <typename U> class SmartPtr>
     blob(const SmartPtr<T>& buffer, uint32_t offset, uint32_t length)
         : _buffer(wrap_in_shared_ptr(buffer)),
-          _content(_buffer.get() + offset),
+          _content(bond::detail::checked_add(_buffer.get(), offset)),
           _length(length)
     {
+        bond::detail::checked_add(_content, length);
     }
 
-#ifndef BOND_NO_CXX11_RVALUE_REFERENCES
     /// @brief Move constructor
     blob(blob&& that) BOND_NOEXCEPT_IF(
-        bond::is_nothrow_move_constructible<boost::shared_ptr<const char[]> >::value)
+        std::is_nothrow_move_constructible<boost::shared_ptr<const char[]> >::value)
         : _buffer(std::move(that._buffer)),
           _content(std::move(that._content)),
           _length(std::move(that._length))
@@ -105,17 +115,28 @@ public:
         that._content = 0;
         that._length = 0;
     }
-#endif
 
-#ifndef BOND_NO_CXX11_DEFAULTED_FUNCTIONS
+    blob& operator=(blob&& that) BOND_NOEXCEPT_IF(
+        std::is_nothrow_move_assignable<boost::shared_ptr<const char[]> >::value)
+    {
+        _buffer = std::move(that._buffer);
+        _content = std::move(that._content);
+        _length = std::move(that._length);
+        that._content = 0;
+        that._length = 0;
+        return *this;
+    }
+
     blob(const blob& that) = default;
     blob& operator=(const blob& that) = default;
-#endif
 
     /// @brief Assign a new value from another blob object or its part
     void assign(const blob& from, uint32_t offset, uint32_t length)
     {
-        BOOST_ASSERT((offset + length) <= from._length);
+        if (bond::detail::checked_add(offset, length) > from._length)
+        {
+            throw std::invalid_argument("Total of offset and length too large; must be less than or equal to length of blob");
+        }
 
         _buffer = from._buffer;
         _content = from._content + offset;
@@ -143,7 +164,10 @@ public:
     /// @brief Return a blob object for a range of this object
     blob range(uint32_t offset, uint32_t length) const
     {
-        BOOST_ASSERT((offset + length) <= _length);
+        if (bond::detail::checked_add(offset, length) > _length)
+        {
+            throw std::invalid_argument("Total of offset and length too large; must be less than or equal to length of blob");
+        }
 
         blob temp;
         temp._buffer = _buffer;
@@ -157,7 +181,10 @@ public:
     /// the end of the buffer
     blob range(uint32_t offset) const
     {
-        BOOST_ASSERT(offset <= _length);
+        if (offset > _length)
+        {
+            throw std::invalid_argument("Offset too large; must be less than or equal to length of blob");
+        }
 
         blob temp = *this;
         temp._content += offset;
@@ -236,6 +263,9 @@ public:
     template <typename T>
     friend T blob_cast(const blob& from);
 
+    template <typename A>
+    friend blob blob_prolong(blob src, const A& allocator);
+
 private:
     template <typename T>
     struct deleter
@@ -291,7 +321,7 @@ inline blob merge(const A& allocator, const blob& x, const blob& y)
     }
     else
     {
-        uint32_t length = x.length() + y.length();
+        uint32_t length = detail::checked_add(x.length(), y.length());
         boost::shared_ptr<char[]> buffer = boost::allocate_shared_noinit<char[]>(allocator, length);
 
         ::memcpy(buffer.get(), x.content(), x.length());
@@ -310,7 +340,7 @@ inline blob merge(const A& allocator, t_It begin, t_It end)
     uint32_t length = 0;
     for (t_It it = begin; it != end; ++it)
     {
-        length += it->length();
+        length = detail::checked_add(length, it->length());
     }
 
     if (0 == length)
@@ -320,8 +350,7 @@ inline blob merge(const A& allocator, t_It begin, t_It end)
         //
         return blob();
     }
-    else
-    if (length == begin->length())
+    else if (length == begin->length())
     {
         //
         // just first blob in the sequence is not empty
@@ -363,7 +392,7 @@ inline blob merge(t_It begin, t_It end)
 
 template <> struct
 is_list_container<blob>
-    : true_type {};
+    : std::true_type {};
 
 
 template <typename T>
@@ -382,9 +411,25 @@ inline T blob_cast(const blob& from)
     }
 }
 
+/// @brief Returns a blob with a copy of the data if the original one does not own the memory
+/// (i.e. constructed using raw memory), and the same blob otherwise.
+template <typename A>
+inline blob blob_prolong(blob src, const A& allocator)
+{
+    if (src._buffer)
+    {
+        return src;
+    }
 
-template <> struct
-is_blob<blob>
-    : true_type {};
+    boost::shared_ptr<char[]> buffer = boost::allocate_shared_noinit<char[]>(allocator, src.length());
+    ::memcpy(buffer.get(), src.content(), src.length());
+    return blob(buffer, src.length());
+}
+
+inline blob blob_prolong(blob src)
+{
+    return blob_prolong(std::move(src), std::allocator<char>());
+}
+
 
 } // namespace bond

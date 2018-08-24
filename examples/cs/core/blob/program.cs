@@ -1,8 +1,8 @@
 ﻿namespace Examples
 {
-    using System.Diagnostics;
     using System;
     using System.Linq;
+
     using Bond;
     using Bond.Protocols;
     using Bond.IO.Unsafe;
@@ -21,7 +21,7 @@
                 },
 
                 NullableBlob = new ArraySegment<byte>(data, 20, 10),
-                UninitializeBlob = new ArraySegment<byte>(data, 30, 70)
+                UninitializedBlob = new ArraySegment<byte>(data, 30, 70)
             };
 
             var output = new OutputBuffer();
@@ -33,7 +33,12 @@
             var reader = new CompactBinaryReader<InputBuffer>(input);
 
             var dst = Deserialize<Example>.From(reader);
-            Debug.Assert(Comparer.Equal(src, dst));
+            ThrowIfFalse(Comparer.Equal(src, dst));
+        }
+
+        static void ThrowIfFalse(bool b)
+        {
+            if (!b) throw new Exception("Assertion failed");
         }
     }
 }

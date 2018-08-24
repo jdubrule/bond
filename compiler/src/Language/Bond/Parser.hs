@@ -21,67 +21,47 @@ module Language.Bond.Parser
     )
     where
 
-import Data.Ord
-import Data.List
+import Control.Applicative hiding (some)
+import Control.Monad.Reader
+import Control.Monad.State.Lazy
 import Data.Function
 import Data.Int
+import Data.List
+import Data.Maybe (fromMaybe)
+import Data.Ord
+import Data.Void (Void)
 import Data.Word
-import Control.Applicative
-import Control.Monad.Reader
-import Prelude
-import Text.Parsec.Pos (initialPos)
-import Text.Parsec hiding (many, optional, (<|>))
 import Language.Bond.Lexer
+import Language.Bond.Syntax.Internal
 import Language.Bond.Syntax.Types
 import Language.Bond.Syntax.Util
-import Language.Bond.Syntax.Internal
-
--- parser state, mutable and global
-data Symbols =
-    Symbols
-    { symbols :: [Declaration]  -- list of structs, enums and aliases declared in the current and all imported files
-    , imports :: [FilePath]     -- list of imported files
-    }
-
-type ImportResolver =
-    FilePath                    -- ^ path of the file containing the <https://microsoft.github.io/bond/manual/compiler.html#import-statements import statement>
- -> FilePath                    -- ^ (usually relative) path of the imported file
- -> IO (FilePath, String)       -- ^ the resolver function returns the resolved path of the imported file and its content
-
--- parser environment, immutable but contextual
-data Environment =
-    Environment
-    { currentNamespaces :: [Namespace]  -- namespace(s) in current context
-    , currentParams :: [TypeParam]      -- type parameter(s) for current type (struct or alias)
-    , currentFile :: FilePath           -- path of the current file
-    , resolveImport :: ImportResolver   -- imports resolver
-    }
-
-type Parser a = ParsecT String Symbols (ReaderT Environment IO) a
+import Prelude
+import Text.Megaparsec hiding (many, optional, (<|>))
+import Text.Megaparsec.Char (char)
 
 -- | Parses content of a schema definition file.
 parseBond ::
-    SourceName                          -- ^ source name, used only for error messages
+    String                              -- ^ source name, used only for error messages
  -> String                              -- ^ content of a schema file to parse
  -> FilePath                            -- ^ path of the file being parsed, used to resolve relative import paths
  -> ImportResolver                      -- ^ function to resolve and load imported files
- -> IO (Either ParseError Bond)         -- ^ function returns 'Bond' which represents the parsed abstract syntax tree
+ -> IO (Either (ParseError Char Void) Bond)         -- ^ function returns 'Bond' which represents the parsed abstract syntax tree
                                         --   or 'ParserError' if parsing failed
-parseBond s c f r = runReaderT (runParserT bond (Symbols [] []) s c) (Environment [] [] f r)
+parseBond s c f r = runReaderT (runParserT (evalStateT bond (Symbols [] [])) s c) (Environment [] [] f r)
 
 -- parser for .bond files
 bond :: Parser Bond
 bond = do
     whiteSpace
     imports <- many import_
-    namespaces <- many1 namespace
+    namespaces <- some namespace
     local (with namespaces) $ Bond imports namespaces <$> many declaration <* eof
   where
     with namespaces e = e { currentNamespaces = namespaces }
 
 import_ :: Parser Import
 import_ = do
-    i <- Import <$ keyword "import" <*> unescapedStringLiteral <?> "import statement"
+    i <- Import <$ keyword "import" <*> unescapedStringLiteral <* optional semi <?> "import statement"
     src <- getInput
     pos <- getPosition
     processImport i
@@ -93,9 +73,9 @@ processImport :: Import -> Parser()
 processImport (Import file) = do
     Environment { currentFile = currentFile, resolveImport = resolveImport } <- ask
     (path, content) <- liftIO $ resolveImport currentFile file
-    Symbols { imports = imports } <- getState
+    Symbols { imports = imports } <- get
     if path `elem` imports then return () else do
-            modifyState (\u -> u { imports = path:imports } )
+            modify (\u -> u { imports = path:imports } )
             setInput content
             setPosition $ initialPos path
             void $ local (\e -> e { currentFile = path }) bond
@@ -103,21 +83,28 @@ processImport (Import file) = do
 -- parser for struct, enum or type alias declaration/definition
 declaration :: Parser Declaration
 declaration = do
+    -- When adding a new Declaration parser, order matters in the following command.
+    -- Parsers must fail to consume ANY token for the next parser to be able to successfully work
+    -- unless the parser is encapsulated in a try statement. For more info on try and <|> see:
+    -- https://hackage.haskell.org/package/megaparsec-6.2.0/docs/Text-Megaparsec.html#v:try
     decl <- try forward
-        <|> try struct
-        <|> try view
-        <|> try enum
-        <|> try alias
-        <|> try service
+        <|> alias
+        <|> (attributes >>= \a -> (service a <|> enum a <|> structDeclaration a))
     updateSymbols decl <?> "declaration"
+    return decl
+
+structDeclaration :: [Attribute] -> Parser Declaration
+structDeclaration attr = do
+    name <- keyword "struct" *> identifier <?> "struct or struct view definition"
+    decl <- view attr name <|> struct attr name
     return decl
 
 updateSymbols :: Declaration -> Parser ()
 updateSymbols decl = do
-    (previous, symbols) <- partition (duplicateDeclaration decl) <$> symbols <$> getState
+    (previous, symbols) <- partition (duplicateDeclaration decl) <$> symbols <$> get
     case reconcile previous decl of
         (False, _) -> fail $ "The " ++ showPretty decl ++ " has been previously defined as " ++ showPretty (head previous)
-        (True, f) -> modifyState (f symbols)
+        (True, f) -> modify (f symbols)
   where
     reconcile [x@Forward {}] y@Struct {} = (paramsMatch x y, add y)
     reconcile [x@Forward {}] y@Forward {} = (paramsMatch x y, const id)
@@ -141,7 +128,7 @@ findSymbol name = doFind <?> "qualified name"
   where
     doFind = do
         namespaces <- asks currentNamespaces
-        Symbols { symbols = symbols } <- getState
+        Symbols { symbols = symbols } <- get
         case find (declMatching namespaces name) symbols of
             Just decl -> return decl
             Nothing -> fail $ "Unknown symbol: " ++ showQualifiedName name
@@ -171,9 +158,9 @@ namespace :: Parser Namespace
 namespace = Namespace <$ keyword "namespace" <*> language <*> qualifiedName <* optional semi <?> "namespace declaration"
   where
     language = optional (keyword "cpp" *> pure Cpp
+                     <|> keyword "csharp" *> pure Cs
                      <|> keyword "cs" *> pure Cs
-                     <|> keyword "java" *> pure Java
-                     <|> keyword "csharp" *> pure Cs)
+                     <|> keyword "java" *> pure Java)
 
 -- identifier optionally qualified with namespace
 qualifiedName :: Parser QualifiedName
@@ -189,7 +176,7 @@ parameters = option [] (angles $ commaSep1 param) <?> "type parameters"
 -- type alias
 alias :: Parser Declaration
 alias = do
-    name <- keyword "using" *> identifier <?> "alias definition"
+    name <- try (keyword "using") *> identifier <?> "alias definition"
     params <- parameters
     namespaces <- asks currentNamespaces
     local (with params) $ Alias namespaces name params <$ equal <*> type_ <* semi
@@ -209,11 +196,9 @@ attributes = many attribute <?> "attributes"
     attribute = brackets (Attribute <$> qualifiedName <*> parens stringLiteral <?> "attribute")
 
 -- struct view parser
-view :: Parser Declaration
-view = do
-    attr <- attributes
-    name <- keyword "struct" *> identifier <?> "struct view definition"
-    decl <- keyword "view_of" *> qualifiedName >>= findStruct
+view :: [Attribute] -> String -> Parser Declaration
+view attr name = do
+    decl <- try (keyword "view_of") *> qualifiedName >>= findStruct <?> "struct view definition"
     fields <- braces $ semiOrCommaSepEnd1 identifier
     namespaces <- asks currentNamespaces
     Struct namespaces attr name (declParams decl) (structBase decl) (viewFields decl fields) <$ optional semi
@@ -222,18 +207,19 @@ view = do
     viewFields _           _      = error "view/viewFields: impossible happened."
 
 -- struct definition parser
-struct :: Parser Declaration
-struct = do
-    attr <- attributes
-    name <- keyword "struct" *> identifier <?> "struct definition"
+struct :: [Attribute] -> String -> Parser Declaration
+struct attr name = do
     params <- parameters
     namespaces <- asks currentNamespaces
     updateSymbols $ Forward namespaces name params
     local (with params) $ Struct namespaces attr name params <$> base <*> fields <* optional semi
   where
     base = optional (colon *> userType <?> "base struct")
-    fields = unique $ braces $ manySortedBy (comparing fieldOrdinal) (field <* semi)
+    fields = sortFields $ unique $ braces $ many (field <* semi)
     with params e = e { currentParams = params }
+    sortFields p = do
+        fields' <- p
+        return $ sortBy (comparing fieldOrdinal) fields'
     unique p = do
         fields' <- p
         case findDuplicatesBy fieldOrdinal fields' ++ findDuplicatesBy fieldName fields' of
@@ -258,8 +244,8 @@ field = do
                 else fail "Field ordinal must be within the range 0-65535"
     modifier = option Optional
                     (keyword "optional" *> pure Optional
-                 <|> keyword "required" *> pure Required
-                 <|> keyword "required_optional" *> pure RequiredOptional)
+                 <|> keyword "required_optional" *> pure RequiredOptional
+                 <|> keyword "required" *> pure Required)
     default_ = equal *>
                     (keyword "true" *> pure (DefaultBool True)
                  <|> keyword "false" *> pure (DefaultBool False)
@@ -278,10 +264,10 @@ field = do
                                         else Left "Invalid default value for field"
 
 -- enum definition parser
-enum :: Parser Declaration
-enum = Enum <$> asks currentNamespaces <*> attributes <*> name <*> consts <* optional semi <?> "enum definition"
+enum :: [Attribute] -> Parser Declaration
+enum attr = Enum <$> asks currentNamespaces <*> pure attr <*> name <*> consts <* optional semi <?> "enum definition"
   where
-    name = keyword "enum" *> (identifier <?> "enum identifier")
+    name = try (keyword "enum") *> identifier <?> "enum identifier"
     consts = braces (semiOrCommaSepEnd1 constant <?> "enum constant")
     constant = Constant <$> identifier <*> optional value
     value = equal *> (fromIntegral <$> integer)
@@ -312,10 +298,9 @@ complexType =
     <|> keyword "nullable" *> angles (BT_Nullable <$> type_)
     <|> keyword "set" *> angles (BT_Set <$> keyType)
     <|> keyword "map" *> angles (BT_Map <$> keyType <* comma <*> type_)
-    <|> keyword "bonded" *> angles (BT_Bonded <$> userStruct)
+    <|> keyword "bonded" *> angles (BT_Bonded <$> userStructRef)
   where
     keyType = try (basicType <|> checkUserType isValidKeyType) <?> "scalar, string or enum"
-    userStruct = try (checkUserType isStruct) <?> "user defined struct"
     isValidKeyType t = isScalar t || isString t
 
 -- parser for user defined type (struct, enum, alias or type parameter)
@@ -361,9 +346,11 @@ userSymbol = do
     isParam [name] = (name ==) . paramName
     isParam _      = const False
 
+
+
 -- type parser
 type_ :: Parser Type
-type_ = basicType <|> complexType <|> userType
+type_ = (try basicType) <|> (try complexType) <|> (try userType)
 
 -- field type parser
 ftype :: Parser Type
@@ -372,59 +359,86 @@ ftype = keyword "bond_meta::name" *> pure BT_MetaName
     <|> type_
 
 -- service definition parser
-service :: Parser Declaration
-service = do
-    attr <- attributes
-    name <- keyword "service" *> identifier <?> "service definition"
+service :: [Attribute] -> Parser Declaration
+service attr = do
+    name <- try (keyword "service") *> identifier <?> "service definition"
     params <- parameters
     namespaces <- asks currentNamespaces
     local (with params) $ Service namespaces attr name params <$> base <*> methods <* optional semi
   where
     base = optional (colon *> serviceType <?> "base service")
     with params e = e { currentParams = params }
-    methods = unique $ braces $ semiEnd (try event <|> try function)
-    unique p = do
+    methods = checkUniqueMethodNames $ braces $ semiEnd method
+    checkUniqueMethodNames p = do
         methods' <- p
         case findDuplicatesBy methodName methods' of
             [] -> return methods'
             Function {..}:_ -> fail $ "Duplicate definition of the function with name " ++ show methodName
             Event {..}:_ -> fail $ "Duplicate definition of the event with name " ++ show methodName
 
-function :: Parser Method
-function = Function <$> attributes <*> payload <*> identifier <*> input
+method :: Parser Method
+method = attributes >>= \a -> ((lookAhead (keyword "nothing") *> event a) <|> function a)
 
-event :: Parser Method
-event = Event <$> attributes <* keyword "nothing" <*> identifier <*> input
+function :: [Attribute] -> Parser Method
+function attr = Function attr <$> functionResultType <*> identifier <*> input
+  where functionResultType = methodTypeVoid  <|> methodResultTypeStreaming <|> methodTypeUnary
 
-input :: Parser (Maybe Type)
-input = do
-  pld <- parens $ optional payload
-  case pld of
-      Nothing -> pure Nothing
-      Just m -> return m
+event :: [Attribute] -> Parser Method
+event attr = do
+  _ <- keyword "nothing"
+  methodName <- identifier
+  methodInput <- input
+  case methodInput of
+    (Streaming _) -> fail $ "Incompatible nothing return and streaming input in method " ++ show methodName
+    _ -> return (Event attr methodName methodInput)
 
-payload :: Parser (Maybe Type)
-payload = void_ <|> liftM Just userStruct
-  where
-    void_ = keyword "void" *> pure Nothing
-    userStruct = try (checkUserType isStruct) <?> "user defined struct"
+input :: Parser MethodType
+input = parens methodInputType
+  where methodInputType = (fromMaybe Void) <$> optional (methodTypeVoid <|> methodInputTypeStreaming <|> methodTypeUnary)
+
+methodTypeVoid :: Parser MethodType
+methodTypeVoid = try (keyword "void" *> pure Void) <?> "void method type"
+
+-- Whether the method type is streaming or is unary can be determined based on
+-- context, but the context is different for result and input types.
+--
+-- For result types, the keyword stream followed by a struct name AND THEN
+-- an identifier indicates a streaming type. Two identifiers are required to
+-- distinguish between the unary method "stream stream()" and the streaming
+-- method "stream stream stream()".
+--
+-- For input types, simply the keyword stream followed by a struct name is
+-- enough to distinguish between the unary "foo(stream)" and the streaming
+-- "foo(stream stream)".
+methodResultTypeStreaming :: Parser MethodType
+methodResultTypeStreaming = try (do
+                                    _ <- keyword "stream"
+                                    resultType <- userStructRef
+                                    _ <- lookAhead identifier
+                                    return (Streaming resultType)) <?> "streaming method type"
+
+methodInputTypeStreaming :: Parser MethodType
+methodInputTypeStreaming = try (Streaming <$ keyword "stream" <*> userStructRef) <?> "streaming method type"
+
+methodTypeUnary :: Parser MethodType
+methodTypeUnary = (Unary <$> userStructRef) <?> "unary method type"
 
 -- helper methods
 
 checkUserType :: (Type -> Bool) -> Parser Type
 checkUserType check = do
     t <- userType
-    if (valid t) then return t else unexpected "type"
+    if (valid t) then return t else fail "unexpected type"
   where
     valid t = case t of
         BT_TypeParam _ -> True
         _ -> check t
 
+userStructRef :: Parser Type
+userStructRef = try (checkUserType isStruct) <?> "user defined struct reference"
+
 findDuplicatesBy :: (Eq b) => (a -> b) -> [a] -> [a]
 findDuplicatesBy accessor xs = deleteFirstsBy ((==) `on` accessor) xs (nubBy ((==) `on` accessor) xs)
-
-manySortedBy :: (a -> a -> Ordering) -> ParsecT s u m a -> ParsecT s u m [a]
-manySortedBy = manyAccum . insertBy
 
 -- default type validator (type checking, out-of-range, enforce default type)
 validDefaultType :: Type -> Maybe Default -> Bool
@@ -452,7 +466,6 @@ validDefaultType bondType (Just defaultValue) = validDefaultType' bondType defau
         validDefaultType' _ _                           = False
 
 -- checks whether an Integer is within the bounds of some other Integral and Bounded type.
--- The value of the second paramater is never used: only its type is used.
+-- The value of the second parameter is never used: only its type is used.
 isInBounds :: forall a. (Integral a, Bounded a) => Integer -> a -> Bool
 isInBounds value _ = value >= (toInteger (minBound :: a)) && value <= (toInteger (maxBound :: a))
-

@@ -29,10 +29,10 @@ int main()
     obj.items.resize(1);
     obj.items[0].numbers.push_back(13);
 
-    Item item;
+    Item<uint32_t> item;
 
     item.numbers.push_back(11);
-    obj.item = bond::bonded<Item>(item);
+    obj.item = bond::bonded<Item<uint32_t>>(item);
 
     // Serialize
     bond::OutputBuffer buffer;
@@ -47,7 +47,7 @@ int main()
     bond::CompactBinaryReader<bond::InputBuffer> reader(data);
     bond::Deserialize(reader, obj2);
 
-    Item item2;
+    Item<uint32_t> item2;
     
     obj2.item.Deserialize(item2);
 
@@ -59,6 +59,9 @@ int main()
     bond::RuntimeSchema schema = bond::GetRuntimeSchema<MyStruct>();
 
     std::cout << schema.GetSchema().structs[schema.GetSchema().root.struct_def].fields[0].metadata.name << std::endl;
+
+    // Use enum
+    std::cout << static_cast<int>(Color::Red) << " = " << ToString(Color::Red) << std::endl;
     
     return 0;    
 }

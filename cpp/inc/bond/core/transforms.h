@@ -3,16 +3,18 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
 #include "bond_fwd.h"
-#include "reflection.h"
-#include "exception.h"
-#include "null.h"
-#include "detail/tags.h"
-#include "detail/odr.h"
-#include "detail/omit_default.h"
 #include "detail/debug.h"
 #include "detail/double_pass.h"
 #include "detail/marshaled_bonded.h"
+#include "detail/odr.h"
+#include "detail/omit_default.h"
+#include "detail/tags.h"
+#include "exception.h"
+#include "null.h"
+#include "reflection.h"
 
 #include <boost/static_assert.hpp>
 
@@ -34,10 +36,10 @@ namespace detail
 
 
 //
-// Serializer writes input using provided protocol writer. 
-// When the input is comming from parsing a struct, applying this transform is  
-// equivalent to serialization using the specfied protocol. 
-// Applying this transform to input from parsing serialized data is equivalent  
+// Serializer writes input using provided protocol writer.
+// When the input is comming from parsing a struct, applying this transform is
+// equivalent to serialization using the specfied protocol.
+// Applying this transform to input from parsing serialized data is equivalent
 // to transcoding from one protocol to another.
 //
 template <typename Writer, typename Protocols>
@@ -54,7 +56,7 @@ public:
           _base(base)
     {}
 
-    
+
     bool NeedPass0() const
     {
         return _output.NeedPass0();
@@ -84,13 +86,14 @@ public:
     template <typename T>
     bool Base(const T& value) const
     {
-        // 'true' means that we are writing a base struct 
+        // 'true' means that we are writing a base struct
         Apply<Protocols>(Serializer(_output, true), value);
         return false;
     }
 
     template <typename T>
-    bool Field(uint16_t id, const Metadata& metadata, const T& value) const
+    typename boost::enable_if_c<may_omit_fields<Writer>::value && !is_bond_type<T>::value, bool>::type
+    Field(uint16_t id, const Metadata& metadata, const T& value) const
     {
         if (detail::omit_field<Writer>(metadata, value))
         {
@@ -103,7 +106,27 @@ public:
     }
 
     template <typename T>
-    bool Field(uint16_t id, const Metadata& metadata, const maybe<T>& value) const
+    typename boost::disable_if_c<may_omit_fields<Writer>::value && !is_bond_type<T>::value, bool>::type
+    Field(uint16_t id, const Metadata& metadata, const T& value) const
+    {
+        BOOST_ASSERT(!detail::omit_field<Writer>(metadata, value));
+
+        WriteField(id, metadata, value);
+        return false;
+    }
+
+    template <typename T, typename Reader>
+    bool Field(uint16_t id, const Metadata& metadata, const value<T, Reader>& value) const
+    {
+        BOOST_ASSERT(!detail::omit_field<Writer>(metadata, value));
+
+        WriteField(id, metadata, value);
+        return false;
+    }
+
+    template <typename T, typename W = Writer>
+    typename boost::enable_if<may_omit_fields<W>, bool>::type
+    Field(uint16_t id, const Metadata& metadata, const maybe<T>& value) const
     {
         if (detail::omit_field<Writer>(metadata, value))
         {
@@ -114,7 +137,17 @@ public:
         WriteField(id, metadata, value.value());
         return false;
     }
-    
+
+    template <typename T, typename W = Writer>
+    typename boost::disable_if<may_omit_fields<W>, bool>::type
+    Field(uint16_t id, const Metadata& metadata, const maybe<T>& value) const
+    {
+        BOOST_ASSERT(!detail::omit_field<Writer>(metadata, value));
+
+        WriteField(id, metadata, value.value());
+        return false;
+    }
+
     // unknown field
     template <typename T>
     bool UnknownField(uint16_t id, const T& value) const
@@ -133,7 +166,7 @@ public:
         return false;
     }
 
-    
+
     template <typename T>
     void Container(const T& element, uint32_t size) const
     {
@@ -141,7 +174,7 @@ public:
 
         while (size--)
             Write(element);
-    
+
         _output.WriteContainerEnd();
     }
 
@@ -156,7 +189,7 @@ public:
             Write(key);
             Write(value);
         }
-    
+
         _output.WriteContainerEnd();
     }
 
@@ -258,11 +291,11 @@ private:
     Write(const value<T, Reader>& value) const
     {
         T data = T();
-        
+
         value.template Deserialize<Protocols>(data);
         Write(data);
     }
-    
+
     template <typename Reader, typename T>
     typename boost::disable_if<is_basic_type<T> >::type
     Write(const value<T, Reader>& value) const
@@ -270,7 +303,7 @@ private:
         Apply<Protocols>(Serializer(_output), value);
     }
 
-    
+
     template <typename T, typename WriterT, typename ProtocolsT>
     friend class Merger;
 
@@ -307,7 +340,7 @@ public:
     Marshaler(Writer& output)
         : Serializer<Writer, Protocols>(output)
     {}
-    
+
     template <typename T>
     bool Marshal(const T& value) const
     {
@@ -329,7 +362,7 @@ ApplyTransform(const Marshaler<Writer, Protocols>& marshaler, const bonded<T, Re
 
 
 template <typename Protocols, typename Writer, typename T>
-bool inline 
+bool inline
 ApplyTransform(const Marshaler<Writer, Protocols>& marshaler, const T& value)
 {
     return marshaler.Marshal(value);
@@ -354,10 +387,10 @@ protected:
     {
         _required = next_required_field<typename schema<T>::type::fields>::value;
     }
-        
+
     template <typename Head>
-    typename boost::enable_if<is_same<typename Head::field_modifier, 
-                                      reflection::required_field_modifier> >::type
+    typename boost::enable_if<std::is_same<typename Head::field_modifier,
+                                           reflection::required_field_modifier> >::type
     Validate() const
     {
         if (_required == Head::id)
@@ -368,7 +401,7 @@ protected:
 
 
     template <typename Schema>
-    typename boost::enable_if_c<next_required_field<typename Schema::fields>::value 
+    typename boost::enable_if_c<next_required_field<typename Schema::fields>::value
                              != invalid_field_id>::type
     Validate() const
     {
@@ -378,27 +411,30 @@ protected:
 
 
     template <typename Head>
-    typename boost::disable_if<is_same<typename Head::field_modifier, 
-                                       reflection::required_field_modifier> >::type
+    typename boost::disable_if<std::is_same<typename Head::field_modifier,
+                                            reflection::required_field_modifier> >::type
     Validate() const
     {}
 
 
     template <typename Schema>
-    typename boost::disable_if_c<next_required_field<typename Schema::fields>::value 
+    typename boost::disable_if_c<next_required_field<typename Schema::fields>::value
                               != invalid_field_id>::type
     Validate() const
     {}
 
 private:
     BOND_NORETURN void MissingFieldException() const;
-    
+
     mutable uint16_t _required;
 };
 
 template <typename T>
 void RequiredFieldValiadator<T>::MissingFieldException() const
 {
+    // Force instantiation of template statics
+    (void)typename schema<T>::type();
+
     BOND_THROW(CoreException,
           "De-serialization failed: required field " << _required <<
           " is missing from " << schema<T>::type::metadata.qualified_name);
@@ -411,7 +447,6 @@ void RequiredFieldValiadator<T>::MissingFieldException() const
 namespace detail
 {
 
-template <typename Protocols>
 class To
     : public DeserializingTransform
 {
@@ -419,36 +454,23 @@ public:
     void UnknownEnd() const
     {}
 
-    bool UnknownField(...) const
+    template <typename X>
+    bool UnknownField(uint16_t /*id*/, const X& /*value*/) const
     {
         return false;
     }
 
 protected:
-    template <typename V, typename X>
+    template <typename Protocols, typename V, typename X>
     void AssignToVar(V& var, const X& value) const
     {
         value.template Deserialize<Protocols>(var);
     }
 
-    template <typename V, typename X>
+    template <typename Protocols, typename V, typename X>
     void AssignToVar(maybe<V>& var, const X& value) const
     {
-        value.template Deserialize<Protocols>(var.set_value());
-    }
-
-    template <typename V, typename X>
-    typename boost::enable_if<has_base<V>, bool>::type
-    AssignToBase(V& var, const X& value) const
-    {
-        return Apply<Protocols>(bond::To<typename schema<V>::type::base, Protocols>(var), value);
-    }
-
-    template <typename V, typename X>
-    typename boost::disable_if<has_base<V>, bool>::type
-    AssignToBase(V& /*var*/, const X& /*value*/) const
-    {
-        return false;
+        AssignToVar<Protocols>(var.set_value(), value);
     }
 
     template <typename X>
@@ -463,7 +485,7 @@ protected:
 
 template <typename T, typename Protocols, typename Validator>
 class To
-    : public detail::To<Protocols>,
+    : public detail::To,
       protected Validator
 {
 public:
@@ -474,7 +496,7 @@ public:
     void Begin(const Metadata& /*metadata*/) const
     {
         // Type T must be a Bond struct (i.e. struct generated by Bond codegen
-        // from a .bond file). If the assert fails for a Bond struct, the likely 
+        // from a .bond file). If the assert fails for a Bond struct, the likely
         // reason is that you didn't include the generated file *_reflection.h.
         BOOST_STATIC_ASSERT(has_schema<T>::value);
 
@@ -497,7 +519,7 @@ public:
     template <typename X>
     bool Base(const X& value) const
     {
-        return AssignToBase(_var, value);
+        return AssignToBase(value);
     }
 
 
@@ -526,21 +548,41 @@ public:
 
 
     // Fast path for the common case when parser is using compile-time schema schema<T>::type
-    // and thus already knows schema type for each field.  
+    // and thus already knows schema type for each field.
     typedef T FastPathType;
 
     template <typename FieldT, typename X>
     bool Field(const FieldT&, const X& value) const
     {
         Validator::template Validate<FieldT>();
-        AssignToVar(FieldT::GetVariable(_var), value);
+        AssignToVar<Protocols>(FieldT::GetVariable(_var), value);
         return false;
     }
 
 private:
-    using detail::To<Protocols>::AssignToBase;
-    using detail::To<Protocols>::AssignToVar;
-    using detail::To<Protocols>::AssignToField;
+    using detail::To::AssignToVar;
+    using detail::To::AssignToField;
+
+    template <typename X, typename U = T>
+    typename boost::enable_if<has_base<U>, bool>::type
+    AssignToBase(const X& value) const
+    {
+        bool done = Apply<Protocols>(To<typename schema<T>::type::base, Protocols>(_var), value);
+
+        if (done)
+        {
+            UnexpectedStructStopException();
+        }
+
+        return false;
+    }
+
+    template <typename X, typename U = T>
+    typename boost::disable_if<has_base<U>, bool>::type
+    AssignToBase(const X& /*value*/) const
+    {
+        return false;
+    }
 
     template <typename Fields, typename X>
     bool AssignToField(const Fields&, uint16_t id, const X& value) const
@@ -549,9 +591,7 @@ private:
 
         if (id == Head::id)
         {
-            Validator::template Validate<Head>();
-            AssignToVar(Head::GetVariable(_var), value);
-            return false;
+            return Field(Head(), value);
         }
         else
         {
@@ -559,7 +599,16 @@ private:
         }
     }
 
-private:
+    BOND_NORETURN void UnexpectedStructStopException() const
+    {
+        // Force instantiation of template statics
+        (void)typename schema<T>::type();
+
+        BOND_THROW(CoreException,
+            "De-serialization failed: unexpected struct stop encountered for "
+            << schema<T>::type::metadata.qualified_name);
+    }
+
     T& _var;
 };
 
@@ -580,12 +629,11 @@ BOND_STATIC_CONSTEXPR uint16_t mapping_base = invalid_field_id;
 //
 // MapTo<T> maps the input fields onto an instance of a static bond type T,
 // using provided mappings from field path in the source to field path in
-// the type T. Field paths are expressed as a lists of field ids. 
+// the type T. Field paths are expressed as a lists of field ids.
 //
 namespace detail
 {
 
-template <typename Protocols>
 class MapTo
     : public DeserializingTransform
 {
@@ -604,7 +652,7 @@ public:
     {
         return false;
     }
-    
+
 protected:
     struct PathView
         : boost::noncopyable
@@ -629,119 +677,119 @@ protected:
     };
 
 
-    template <typename V, typename X>
+    template <typename Protocols, typename V, typename X>
     bool Assign(V& var, const PathView& ids, const X& value) const
     {
         BOOST_ASSERT(ids.size() > 0);
 
         if (*ids.current == mapping_base)
-            return AssignToBase(base_class<typename schema<V>::type>(), var, ids, value);
+            return AssignToBase<Protocols>(base_class<typename schema<V>::type>(), var, ids, value);
 
         if (ids.size() == 1)
-            return AssignToField(var, *ids.current, value);
+            return AssignToField<Protocols>(var, *ids.current, value);
         else
-            return AssignToNested(var, ids, value);
+            return AssignToNested<Protocols>(var, ids, value);
     }
-    
-    
-    template <typename V, typename X>
+
+
+    template <typename Protocols, typename V, typename X>
     bool AssignToNested(V& var, const PathView& ids, const X& value) const
     {
-        return AssignToNested(typename boost::mpl::begin<typename struct_fields<V>::type>::type(), var, ids, value);
+        return AssignToNested<Protocols>(typename boost::mpl::begin<typename struct_fields<V>::type>::type(), var, ids, value);
     }
 
 
-    template <typename BaseT, typename V, typename X>    
+    template <typename Protocols, typename BaseT, typename V, typename X>
     bool AssignToBase(const BaseT*, V& var, const PathView& ids, const X& value) const
     {
-        return Assign(static_cast<BaseT&>(var), PathView(ids.path, ids.current + 1), value);
+        return Assign<Protocols>(static_cast<BaseT&>(var), PathView(ids.path, ids.current + 1), value);
     }
 
-    
-    template <typename V, typename X>    
+
+    template <typename Protocols, typename V, typename X>
     bool AssignToBase(const no_base*, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
     {
         return false;
     }
 
 
-    template <typename Nested, typename V, typename X>
+    template <typename Protocols, typename Nested, typename V, typename X>
     bool AssignToNested(const Nested&, V& var, const PathView& ids, const X& value) const
     {
         typedef typename boost::mpl::deref<Nested>::type Head;
 
         if (*ids.current == Head::id)
-            return Assign(Head::GetVariable(var), PathView(ids.path, ids.current + 1), value);
+            return Assign<Protocols>(Head::GetVariable(var), PathView(ids.path, ids.current + 1), value);
         else
-            return AssignToNested(typename boost::mpl::next<Nested>::type(), var, ids, value);
+            return AssignToNested<Protocols>(typename boost::mpl::next<Nested>::type(), var, ids, value);
     }
 
-    template <typename V, typename X>
+    template <typename Protocols, typename V, typename X>
     bool AssignToNested(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, const PathView& /*ids*/, const X& /*value*/) const
     {
         return false;
     }
 
-    
-    // Separate AssignToField overloads for bonded<T>, basic types and containers allows us 
+
+    // Separate AssignToField overloads for bonded<T>, basic types and containers allows us
     // to use simpler predicates in boost::mpl::copy_if. This doesn't matter for runtime code
     // but compiles significantly faster.
-    template <typename Reader, typename V, typename X>
+    template <typename Protocols, typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const bonded<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename nested_fields<V>::type>::type(), var, id, value);
+        return AssignToField<Protocols>(typename boost::mpl::begin<typename nested_fields<V>::type>::type(), var, id, value);
     }
 
-    
-    template <typename Reader, typename V, typename X>
+
+    template <typename Protocols, typename Reader, typename V, typename X>
     bool AssignToField(V& var, uint16_t id, const value<X, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename matching_fields<V, X>::type>::type(), var, id, value);
+        return AssignToField<Protocols>(typename boost::mpl::begin<typename matching_fields<V, X>::type>::type(), var, id, value);
     }
 
 
-    template <typename Reader, typename V>
+    template <typename Protocols, typename Reader, typename V>
     bool AssignToField(V& var, uint16_t id, const value<void, Reader>& value) const
     {
-        return AssignToField(typename boost::mpl::begin<typename container_fields<V>::type>::type(), var, id, value);
+        return AssignToField<Protocols>(typename boost::mpl::begin<typename container_fields<V>::type>::type(), var, id, value);
     }
 
-    
-    template <typename Fields, typename V, typename X>
+
+    template <typename Protocols, typename Fields, typename V, typename X>
     bool AssignToField(const Fields&, V& var, uint16_t id, const X& value) const
     {
         typedef typename boost::mpl::deref<Fields>::type Head;
 
         if (id == Head::id)
         {
-            AssignToVar(Head::GetVariable(var), value);
+            AssignToVar<Protocols>(Head::GetVariable(var), value);
             return false;
         }
         else
         {
-            return AssignToField(typename boost::mpl::next<Fields>::type(), var, id, value);
+            return AssignToField<Protocols>(typename boost::mpl::next<Fields>::type(), var, id, value);
         }
     }
 
-    
-    template <typename V, typename X>
+
+    template <typename Protocols, typename V, typename X>
     bool AssignToField(const boost::mpl::l_iter<boost::mpl::l_end>&, V& /*var*/, uint16_t /*id*/, const X& /*value*/) const
     {
         return false;
     }
 
 
-    template <typename V, typename X>
+    template <typename Protocols, typename V, typename X>
     void AssignToVar(V& var, const X& value) const
     {
         value.template Deserialize<Protocols>(var);
     }
 
-    
-    template <typename V, typename X>
+
+    template <typename Protocols, typename V, typename X>
     void AssignToVar(maybe<V>& var, const X& value) const
     {
-        value.template Deserialize<Protocols>(var.set_value());
+        AssignToVar<Protocols>(var.set_value(), value);
     }
 };
 
@@ -750,7 +798,7 @@ protected:
 
 template <typename T, typename Protocols = BuiltInProtocols>
 class MapTo
-    : public detail::MapTo<Protocols>
+    : public detail::MapTo
 {
 public:
     BOOST_STATIC_ASSERT(has_schema<T>::value);
@@ -760,7 +808,7 @@ public:
           _mappings(mappings)
     {}
 
-    
+
     template <typename X>
     bool Base(const X& value) const
     {
@@ -782,12 +830,12 @@ public:
         if (it != _mappings.end())
         {
             if (!it->second.fields.empty())
-                return Apply(MapTo(_var, it->second.fields), value);
-            
+                return Apply<Protocols>(MapTo(_var, it->second.fields), value);
+
             if (!it->second.path.empty())
-                return this->Assign(_var, it->second.path, value);
+                return Assign<Protocols>(_var, it->second.path, value);
         }
-        
+
         return false;
     }
 
@@ -799,12 +847,14 @@ public:
         Mappings::const_iterator it = _mappings.find(id);
 
         if (it != _mappings.end() && !it->second.path.empty())
-            return this->Assign(_var, it->second.path, value);
+            return Assign<Protocols>(_var, it->second.path, value);
         else
             return false;
     }
 
 private:
+    using detail::MapTo::Assign;
+
     T&               _var;
     const Mappings&  _mappings;
 };

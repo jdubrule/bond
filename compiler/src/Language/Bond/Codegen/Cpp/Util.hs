@@ -15,13 +15,14 @@ module Language.Bond.Codegen.Cpp.Util
     , defaultValue
     , attributeInit
     , schemaMetadata
-    , ifndef
-    , defaultedFunctions
-    , defaultedMoveCtors
-    , rvalueReferences
     , enumDefinition
+    , isEnumDeclaration
+    , enumValueToNameInitList
+    , enumNameToValueInitList
     ) where
 
+import Data.Int (Int64)
+import Data.List (sortOn)
 import Data.Monoid
 import Prelude
 import Data.Text.Lazy (Text, unpack)
@@ -67,10 +68,14 @@ template d = if null $ declParams d then mempty else [lt|template <typename #{pa
 -- attribute initializer
 attributeInit :: [Attribute] -> Text
 attributeInit [] = "::bond::reflection::Attributes()"
-attributeInit xs = [lt|boost::assign::map_list_of<std::string, std::string>#{newlineBeginSep 5 attrNameValue xs}|]
+attributeInit xs = [lt|{
+                    #{commaLineSep 5 attrNameValueText sortedAttributes}
+                }|]
   where
-    idl = MappingContext idlTypeMapping [] [] []  
-    attrNameValue Attribute {..} = [lt|("#{getQualifiedName idl attrName}", "#{attrValue}")|]
+    idl = MappingContext idlTypeMapping [] [] []
+    attrNameValue Attribute {..} = (getQualifiedName idl attrName, attrValue)
+    sortedAttributes = sortOn fst $ map attrNameValue xs
+    attrNameValueText (name, value) = [lt|{ "#{name}", "#{value}" }|]
 
 
 -- modifier tag type for a field
@@ -147,16 +152,6 @@ schemaMetadata _ s@Service {..} = [lt|
                 #{attributeInit a});|]
 schemaMetadata _ _ = error "schemaMetadata: impossible happened."
 
-defaultedFunctions, defaultedMoveCtors, rvalueReferences :: Text
-defaultedFunctions = [lt|BOND_NO_CXX11_DEFAULTED_FUNCTIONS|]
-defaultedMoveCtors = [lt|BOND_NO_CXX11_DEFAULTED_MOVE_CTOR|]
-rvalueReferences = [lt|BOND_NO_CXX11_RVALUE_REFERENCES|]
-
-ifndef :: ToText a => a -> Text -> Text
-ifndef m = between [lt|
-#ifndef #{m}|] [lt|
-#endif|]
-
 enumDefinition :: Declaration -> Text
 enumDefinition Enum {..} = [lt|enum #{declName}
         {
@@ -167,3 +162,22 @@ enumDefinition Enum {..} = [lt|enum #{declName}
     value (-2147483648) = [lt| = static_cast<int32_t>(-2147483647-1)|]
     value x = [lt| = static_cast<int32_t>(#{x})|]
 enumDefinition _ = error "enumDefinition: impossible happened."
+
+isEnumDeclaration :: Declaration -> Bool
+isEnumDeclaration Enum {} = True
+isEnumDeclaration _ = False
+
+
+enumValueToNameInitList :: Int64 -> Declaration -> Text
+enumValueToNameInitList n Enum {..} = commaLineSep n valueNameConst enumConstByValue
+  where
+    valueNameConst (name, _) = [lt|{ #{name}, "#{name}" }|]
+    enumConstByValue = sortOn snd $ reifyEnumValues enumConstants
+enumValueToNameInitList _ _ = error "enumValueToNameInitList: impossible happened."
+
+enumNameToValueInitList :: Int64 -> Declaration -> Text
+enumNameToValueInitList n Enum {..} = commaLineSep n nameValueConst enumConstByName
+  where
+    nameValueConst Constant {..} = [lt|{ "#{constantName}", #{constantName} }|]
+    enumConstByName = sortOn constantName enumConstants
+enumNameToValueInitList _ _ = error "enumNameToValueInitList: impossible happened."

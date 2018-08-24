@@ -10,11 +10,16 @@
 
 #pragma once
 
-#include "mpl.h"
 #include <bond/core/config.h>
+
+#include "mpl.h"
+
+#include <bond/core/config.h>
+
 #include <boost/assert.hpp>
 #include <boost/static_assert.hpp>
 #include <boost/utility/enable_if.hpp>
+
 #include <cstdint>
 #include <type_traits>
 
@@ -139,7 +144,7 @@ private:
         template <typename T>
         struct impl<T, false>
         {
-            static T* unsafe_cast(any& x) BOND_NOEXCEPT
+            static T*& unsafe_cast(any& x) BOND_NOEXCEPT
             {
                 BOOST_ASSERT(TypeId<T>::value == x._id);
                 return *static_cast<T**>(x.data());
@@ -158,7 +163,9 @@ private:
 
             static void destroy(any& x)
             {
-                delete unsafe_cast(x);
+                T*& ptr = unsafe_cast(x);
+                delete ptr;
+                ptr = nullptr;
             }
         };
 

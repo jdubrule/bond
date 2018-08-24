@@ -5,13 +5,13 @@ set (core_schemas
 set (schemas)
 list (APPEND schemas ${core-schemas})
 
-if (BOND_ENABLE_COMM)
-    set(comm-flag COMM)
+if (BOND_ENABLE_GRPC)
+    set(grpc-flag GRPC)
 endif()
 
 add_bond_codegen (${core_schemas}
     ENUM_HEADER
-    ${comm-flag}
+    ${grpc-flag}
     OUTPUT_DIR ${BOND_GENERATED}/bond/core)
 
 # Generate again into intermediate dir so that we can build libraries
@@ -23,7 +23,7 @@ add_bond_codegen (${core_schemas}
 # in a clean build, leading to collisions in multi-processor build.
 add_bond_codegen (${core_schemas}
     ENUM_HEADER
-    ${comm-flag}
+    ${grpc-flag}
     OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bond/core)
 
 file (GLOB core_headers "inc/bond/core/*.h")
@@ -50,6 +50,14 @@ set (generated_files_apply)
 list (APPEND generated_files_apply
     ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bond/core/bond_apply.cpp)
 
+set (precompiled_sources)
+list (APPEND precompiled_sources
+    "src/bond/core/detail/typeid_value.cpp"
+    "src/bond/core/parser.cpp"
+    "src/bond/core/select_protocol.cpp"
+    "src/bond/core/value.cpp"
+    "src/bond/protocol/detail/rapidjson_utils.cpp")
+
 list (APPEND headers
     ${core_headers}
     ${core_detail_headers}
@@ -57,65 +65,29 @@ list (APPEND headers
     ${protocol_detail_headers}
     ${stream_headers})
 
-if (BOND_ENABLE_COMM)
-    set (comm_schemas
-        ${BOND_IDL}/bond/comm/comm.bond
-        ${BOND_IDL}/bond/comm/transport/packet.bond
-        ${BOND_IDL}/bond/comm/transport/epoxy_transport.bond)
+# grpc-specific headers
+if (BOND_ENABLE_GRPC)
+    file (GLOB ext_grpc_headers "inc/bond/ext/grpc/*.h")
+    source_group ("ext\\grpc" FILES ${ext_grpc_headers})
 
-    list (APPEND schemas ${comm-schemas})
-
-    add_bond_codegen (${comm_schemas}
-        ENUM_HEADER
-        OUTPUT_DIR ${BOND_GENERATED}/bond/comm)
-
-    add_bond_codegen (${comm_schemas}
-        ENUM_HEADER
-        OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bond/comm)
-
-    file (GLOB comm_headers "inc/bond/comm/*.h")
-    source_group ("comm" FILES ${comm_headers})
-
-    file (GLOB comm_detail_headers "inc/bond/comm/detail/*.h")
-    source_group ("comm\\detail" FILES ${comm_detail_headers})
-
-    file (GLOB comm_detail_headers "inc/bond/comm/detail/*.h")
-    source_group ("comm\\detail" FILES ${comm_detail_headers})
-
-    file (GLOB comm_layers_headers "inc/bond/comm/layers/*.h")
-    source_group ("comm\\layers" FILES ${comm_layers_headers})
-
-    file (GLOB comm_transport_headers "inc/bond/comm/transport/*.h")
-    source_group ("comm\\transport" FILES ${comm_transport_headers})
-
-    file (GLOB comm_transport_detail_headers "inc/bond/comm/transport/detail/*.h")
-    source_group ("comm\\transport\\detail" FILES ${comm_transport_detail_headers})
-
-    list (APPEND generated_files_types
-        ${BOND_GENERATED}/bond/comm/comm_types.cpp
-        ${BOND_GENERATED}/bond/comm/packet_types.cpp
-        ${BOND_GENERATED}/bond/comm/epoxy_transport_types.cpp)
-
-    list (APPEND generated_files_apply
-        ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bond/comm/comm_apply.cpp
-        ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bond/comm/packet_apply.cpp
-        ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bond/comm/epoxy_transport_apply.cpp)
+    file (GLOB ext_grpc_detail_headers "inc/bond/ext/grpc/detail/*.h")
+    source_group ("ext\\grpc\\detail" FILES ${ext_grpc_detail_headers})
 
     list (APPEND headers
-        ${comm_headers}
-        ${comm_detail_headers}
-        ${comm_layers_headers}
-        ${comm_transport_headers}
-        ${comm_transport_detail_headers})
-endif(BOND_ENABLE_COMM)
+        ${ext_grpc_headers}
+        ${ext_grpc_detail_headers})
+endif()
 
-source_group ("generated" FILES ${generated_files})
+source_group ("generated" FILES ${generated_files_types} ${generated_files_apply})
 
 add_library (bond
     STATIC
     ${schemas}
     ${generated_files_types}
+    ${precompiled_sources}
     ${headers})
+
+target_compile_definitions (bond PUBLIC -DBOND_LIB_TYPE=BOND_LIB_TYPE_STATIC)
 
 # Boost thread is only needed if the C++ standard library doesn't support
 # std::call_once. However std::once seems problematic on Linux
@@ -143,14 +115,15 @@ install (TARGETS bond bond_apply
 
 install (DIRECTORY ${BOND_IDL}/bond/core DESTINATION include/bond)
 
-if (BOND_ENABLE_COMM)
-    install (DIRECTORY ${BOND_IDL}/bond/comm DESTINATION include/bond)
-endif()
-
 if (BOND_LIBRARIES_INSTALL_CPP)
   install (
     DIRECTORY ${BOND_GENERATED}/bond/
     DESTINATION src/bond/generated
+    FILES_MATCHING PATTERN "*.cpp")
+
+  install (
+    DIRECTORY ${BOND_SOURCE_DIR}/
+    DESTINATION src/
     FILES_MATCHING PATTERN "*.cpp")
 endif()
 

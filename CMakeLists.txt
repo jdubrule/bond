@@ -11,7 +11,9 @@ set (CMAKE_MODULE_PATH
 set (BOND_ENABLE_GRPC
     "TRUE"
     CACHE BOOL "If FALSE, then do not build gRPC integration")
-
+set (BOND_FIND_RAPIDJSON
+    "FALSE"
+    CACHE BOOL "If FALSE, then use and install rapidjson from thirdparty subdirectory")
 # We need to include third-party CMake modules before we configure our own
 # settings so that we don't apply our settings to third-party code.
 add_subdirectory (thirdparty)
@@ -22,6 +24,7 @@ set (BOND_IDL ${CMAKE_CURRENT_SOURCE_DIR}/idl)
 set (BOND_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/cpp/inc)
 set (BOND_PYTHON_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/python/inc)
 set (BOND_GENERATED ${CMAKE_CURRENT_SOURCE_DIR}/cpp/generated)
+set (BOND_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cpp/src)
 set (BOND_COMPAT_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test/compat)
 
 include (Config)
@@ -44,18 +47,28 @@ add_subfolder (doc "doc")
 add_python_subdirectory (python)
 add_subdirectory (examples)
 
+if (BOND_ENABLE_JAVA)
+    add_subdirectory (java)
+endif()
+
 
 install (DIRECTORY
     cpp/inc/bond
     cpp/generated/bond
     python/inc/bond
-    thirdparty/rapidjson/include/rapidjson
     DESTINATION include
     PATTERN *.cpp EXCLUDE)
 
 install (EXPORT bond
     DESTINATION lib/bond
     EXPORT_LINK_INTERFACE_LIBRARIES)
+
+if (NOT BOND_FIND_RAPIDJSON)
+    install (DIRECTORY
+        thirdparty/rapidjson/include/rapidjson
+        DESTINATION include
+        PATTERN *.cpp EXCLUDE)
+endif()
 
 # if BOND_GBC_PATH is set we must copy over that gbc to the install location
 if (BOND_GBC_PATH)

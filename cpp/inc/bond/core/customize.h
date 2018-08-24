@@ -3,15 +3,17 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
 #include "traits.h"
 
 namespace bond
 {
 
 
-template <typename T> struct 
-is_protocol_enabled 
-    : false_type {};
+template <typename T> struct
+is_protocol_enabled
+    : std::false_type {};
 
 
 }

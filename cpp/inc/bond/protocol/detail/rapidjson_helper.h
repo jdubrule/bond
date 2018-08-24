@@ -3,16 +3,18 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
+#include "rapidjson_utils.h"
+
+#include <bond/core/bond_const_enum.h>
+#include <bond/core/bond_types.h>
+#include <bond/core/detail/sdl.h>
+#include <bond/core/exception.h>
+
 #define RAPIDJSON_NO_INT64DEFINE
 #define RAPIDJSON_ASSERT BOOST_ASSERT
 #define RAPIDJSON_PARSE_ERROR(err, offset) bond::RapidJsonException(rapidjson::GetParseError_En(err), offset)
-
-#include <bond/core/bond_const_enum.h>
-#include <bond/core/detail/sdl.h>
-#include <bond/core/exception.h>
-#include <boost/call_traits.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/locale.hpp>
 
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/error/en.h"
@@ -42,6 +44,9 @@
 #endif
 
 #include "rapidjson/writer.h"
+
+#include <boost/noncopyable.hpp>
+
 #include <algorithm>
 
 namespace bond
@@ -57,42 +62,72 @@ class RapidJsonInputStream
 public:
     typedef char Ch;
 
-    RapidJsonInputStream(typename boost::call_traits<Buffer>::reference input)
-        : input(&input),
-          current(0),
-          count(0)
+    explicit RapidJsonInputStream(const Buffer& input)
+        : _input(input),
+          _current(0),
+          _count(0)
     {
-        input.Read(current);
+        _input.Read(_current);
     }
 
-    RapidJsonInputStream(const RapidJsonInputStream& that, typename boost::call_traits<Buffer>::reference input)
-        : input(&input),
-          current(that.current),
-          count(that.count)
-    {}
+    #if defined(_MSC_VER) && _MSC_VER < 1900
+    // since we explicitly implement a move ctor, we need to explicitly
+    // default these
+    RapidJsonInputStream(const RapidJsonInputStream&) = default;
+    RapidJsonInputStream& operator=(const RapidJsonInputStream&) = default;
+
+    // MSVC cannot = default rvalue ctor or move-assign operators
+    RapidJsonInputStream(RapidJsonInputStream&& other)
+        : _input(std::move(other._input)),
+          _current(std::move(other._current)),
+          _count(std::move(other._count))
+    { }
+
+    RapidJsonInputStream& operator=(RapidJsonInputStream&& other)
+    {
+        _input = std::move(other._input);
+        _current = std::move(other._current);
+        _count = std::move(other._count);
+        return *this;
+    }
+    #endif
+
+    const Buffer& GetBuffer() const
+    {
+        return _input;
+    }
+
+    Buffer& GetBuffer()
+    {
+        return _input;
+    }
 
     char Peek()
     {
-        if (!current)
-            input->Read(current);
+        if (!_current)
+        {
+            _input.Read(_current);
+        }
 
-        return current;
+        return _current;
     }
 
     size_t Tell() const
     {
-        return count;
+        return _count;
     }
 
     char Take()
     {
-        char c = current;
-        current = '\0';
+        char c = _current;
+        _current = '\0';
 
         if (!c)
-            input->Read(c);
+        {
+            _input.Read(c);
+        }
 
-        ++count;
+        ++_count;
         return c;
     }
 
@@ -101,20 +136,10 @@ public:
     void Put(char) { BOOST_ASSERT(false); }
     size_t PutEnd(char*) { BOOST_ASSERT(false); return 0; }
 
-    RapidJsonInputStream& operator=(const RapidJsonInputStream& that)
-    {
-        // rapidjson reader makes a local copy of stream within some functions
-        // and assigns it back to its main stream variable before function exit.
-        BOOST_ASSERT(input == that.input);
-        current = that.current;
-        count = that.count;
-        return *this;
-    }
-
 private:
-    typename std::remove_reference<Buffer>::type* input;
-    uint8_t current;
-    size_t count;
+    Buffer _input;
+    uint8_t _current;
+    size_t _count;
 };
 
 
@@ -123,8 +148,8 @@ template <typename Buffer>
 class RapidJsonOutputStream
 {
 public:
-    RapidJsonOutputStream(typename boost::call_traits<Buffer>::reference output)
-        : output(output)
+    explicit RapidJsonOutputStream(Buffer& output)
+        : _output(output)
     {
     }
 
@@ -139,7 +164,7 @@ public:
 
     void Put(char c)
     {
-        output.Write(c);
+        _output.Write(c);
     }
 
     void Flush()
@@ -147,7 +172,7 @@ public:
     }
 
 private:
-    Buffer& output;
+    Buffer& _output;
 };
 
 
@@ -155,7 +180,7 @@ private:
 template <>
 struct RapidJsonInputStream<const rapidjson::UTF8<>::Ch*> : rapidjson::StringStream
 {
-    RapidJsonInputStream(const char* buffer)
+    explicit RapidJsonInputStream(const char* buffer)
         : rapidjson::StringStream(buffer)
     {}
 
@@ -227,7 +252,7 @@ inline void Read(const rapidjson::Value& value, bool& var)
 
 // enum
 template <typename T>
-typename boost::enable_if<is_enum<T> >::type
+typename boost::enable_if<std::is_enum<T> >::type
 Read(const rapidjson::Value& value, T& var)
 {
     if (value.IsString())
@@ -238,7 +263,7 @@ Read(const rapidjson::Value& value, T& var)
 
 // floating point
 template <typename T>
-typename boost::enable_if<is_floating_point<T> >::type
+typename boost::enable_if<std::is_floating_point<T> >::type
 Read(const rapidjson::Value& value, T& var)
 {
     var = static_cast<T>(value.GetDouble());
@@ -254,7 +279,7 @@ Read(const rapidjson::Value& value, T& var)
 
 // unsigned integer
 template <typename T>
-typename boost::enable_if<is_unsigned<T> >::type
+typename boost::enable_if<std::is_unsigned<T> >::type
 Read(const rapidjson::Value& value, T& var)
 {
     var = static_cast<T>(value.GetUint64());
@@ -279,26 +304,17 @@ template <typename T>
 typename boost::enable_if<is_wstring<T> >::type
 Read(const rapidjson::Value& value, T& var)
 {
-    try
-    {
-        const std::basic_string<uint16_t> str =
-            boost::locale::conv::utf_to_utf<uint16_t>(
-                value.GetString(),
-                value.GetString() + value.GetStringLength(),
-                boost::locale::conv::stop);
+    const std::basic_string<uint16_t> str = utf_to_utf(
+        value.GetString(),
+        value.GetString() + value.GetStringLength());
 
-        const size_t length = str.size();
-        resize_string(var, static_cast<uint32_t>(length));
+    const size_t length = str.size();
+    resize_string(var, static_cast<uint32_t>(length));
 
-        std::copy(
-            str.begin(),
-            str.end(),
-            make_checked_array_iterator(string_data(var), length));
-    }
-    catch (const boost::locale::conv::conversion_error &)
-    {
-        UnicodeConversionException();
-    }
+    std::copy(
+        str.begin(),
+        str.end(),
+        make_checked_array_iterator(string_data(var), length));
 }
 
 

@@ -3,10 +3,8 @@
 
 #include <bond/ext/grpc/io_manager.h>
 #include <bond/ext/grpc/server.h>
-#include <bond/ext/grpc/server_builder.h>
 #include <bond/ext/grpc/thread_pool.h>
 #include <bond/ext/grpc/unary_call.h>
-#include <bond/ext/grpc/wait_callback.h>
 
 #include <chrono>
 #include <functional>
@@ -14,19 +12,16 @@
 #include <memory>
 #include <string>
 
-using grpc::Channel;
-using grpc::ServerBuilder;
-using grpc::Status;
-
 using namespace helloworld;
 
 // Logic and data behind the server's behavior.
 class GreeterServiceImpl final : public Greeter::Service
 {
-    void SayHello(
-        bond::ext::gRPC::unary_call<
-            bond::bonded<HelloRequest>,
-            HelloReply> call) override
+public:
+    using Greeter::Service::Service;
+
+private:
+    void SayHello(bond::ext::grpc::unary_call<HelloRequest, HelloReply> call) override
     {
         HelloRequest request = call.request().Deserialize();
 
@@ -39,20 +34,20 @@ class GreeterServiceImpl final : public Greeter::Service
 
 int main()
 {
-    auto ioManager = std::make_shared<bond::ext::gRPC::io_manager>();
-    auto threadPool = std::make_shared<bond::ext::gRPC::thread_pool>();
+    auto ioManager = std::make_shared<bond::ext::grpc::io_manager>();
+    bond::ext::grpc::thread_pool threadPool;
 
-    GreeterServiceImpl service;
+    std::unique_ptr<GreeterServiceImpl> service{ new GreeterServiceImpl{ threadPool } };
 
-    bond::ext::gRPC::server_builder builder;
-    builder.SetThreadPool(threadPool);
     const std::string server_address("127.0.0.1:50051");
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(&service);
-    std::unique_ptr<bond::ext::gRPC::server> server(builder.BuildAndStart());
+
+    ::grpc::ServerBuilder builder;
+    builder.AddListeningPort(server_address, ::grpc::InsecureServerCredentials());
+
+    auto server = bond::ext::grpc::server::Start(builder, std::move(service));
 
     Greeter::Client greeter(
-        grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()),
+        ::grpc::CreateChannel(server_address, ::grpc::InsecureChannelCredentials()),
         ioManager,
         threadPool);
 
@@ -61,24 +56,23 @@ int main()
     HelloRequest request;
     request.name = user;
 
-    bond::ext::gRPC::wait_callback<HelloReply> cb;
-    greeter.AsyncSayHello(request, cb);
-
-    bool waitResult = cb.wait_for(std::chrono::seconds(10));
-
-    if (!waitResult)
+    auto result = greeter.AsyncSayHello(request);
+    if (result.wait_for(std::chrono::seconds(10)) == std::future_status::timeout)
     {
         std::cout << "timeout ocurred";
         return 1;
     }
-    else if (!cb.status().ok())
-    {
-        std::cout << "request failed";
-        return 1;
-    }
 
     HelloReply reply;
-    cb.response().Deserialize(reply);
+    try
+    {
+        result.get().response().Deserialize(reply);
+    }
+    catch (const bond::ext::grpc::UnaryCallException& e)
+    {
+        std::cout << "request failed: " << e.status().error_message();
+        return 1;
+    }
 
     if (reply.message.compare("hello world") != 0)
     {

@@ -7,10 +7,11 @@
 #include "pingpong_reflection.h"
 #include "pingpong_types.h"
 
-#include <bond/ext/detail/countdown_event.h>
 #include <bond/ext/grpc/server.h>
-#include <bond/ext/grpc/server_builder.h>
+#include <bond/ext/grpc/thread_pool.h>
 #include <bond/ext/grpc/unary_call.h>
+
+#include "../../grpc/countdown_event.h"
 
 #include <chrono>
 #include <memory>
@@ -18,17 +19,9 @@
 #include <string>
 #include <thread>
 
-using grpc::Status;
-using grpc::StatusCode;
-
-using grpc::Server;
-using grpc::ServerBuilder;
-using grpc::ServerContext;
-
 using namespace PingPongNS;
-using namespace bond::ext::detail;
 
-static countdown_event Countdown(NumRequests + NumEvents + NumErrors);
+static unit_test::countdown_event Countdown(NumRequests + NumEvents + NumErrors);
 static std::atomic<uint32_t> NumRequestsReceived(0);
 static std::atomic<uint32_t> NumEventsReceived(0);
 static std::atomic<uint32_t> NumErrorsReceived(0);
@@ -37,11 +30,9 @@ static std::atomic<uint32_t> NumErrorsReceived(0);
 class PingPongServiceImpl final : public PingPong::Service
 {
 public:
+    using PingPong::Service::Service;
 
-    void Ping(
-        bond::ext::gRPC::unary_call<
-            bond::bonded<PingRequest>,
-            PingResponse> call) override
+    void Ping(bond::ext::grpc::unary_call<PingRequest, PingResponse> call) override
     {
         PingRequest request = call.request().Deserialize();
 
@@ -69,8 +60,7 @@ public:
 
                 NumErrorsReceived++;
 
-                Status error(StatusCode::UNIMPLEMENTED, "Application Exception");
-                call.FinishWithError(error);
+                call.Finish({ ::grpc::StatusCode::UNIMPLEMENTED, "Application Exception" });
                 Countdown.set();
                 break;
             }
@@ -80,18 +70,14 @@ public:
                 printf("Received unknown request \"%s\"\n", request.Payload.c_str());
                 fflush(stdout);
 
-                Status error(StatusCode::UNIMPLEMENTED, "Unknown PingAction");
-                call.FinishWithError(error);
+                call.Finish({ ::grpc::StatusCode::UNIMPLEMENTED, "Unknown PingAction" });
                 Countdown.set();
                 break;
             }
         }
     }
 
-    void PingEvent(
-        bond::ext::gRPC::unary_call<
-        bond::bonded<PingRequest>,
-        bond::Void> call) override
+    void PingEvent(bond::ext::grpc::unary_call<PingRequest, bond::reflection::nothing> call) override
     {
         PingRequest request = call.request().Deserialize();
 
@@ -100,9 +86,6 @@ public:
 
         NumEventsReceived++;
 
-        // TODO: the current implementation requires that we respond with dummy data.
-        // This will be fixed in a later release.
-        call.Finish(bond::bonded<bond::Void>{bond::Void()});
         Countdown.set();
     }
 
@@ -110,23 +93,24 @@ public:
 
 int main()
 {
-    PingPongServiceImpl service;
-    auto threadPool = std::make_shared<bond::ext::gRPC::thread_pool>();
+    bond::ext::grpc::thread_pool threadPool;
 
-    bond::ext::gRPC::server_builder builder;
-    builder.SetThreadPool(threadPool);
+    std::unique_ptr<PingPongServiceImpl> service{ new PingPongServiceImpl{ threadPool } };
+
     const std::string server_address("127.0.0.1:" + std::to_string(Port));
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(&service);
-    std::unique_ptr<bond::ext::gRPC::server> server(builder.BuildAndStart());
+
+    ::grpc::ServerBuilder builder;
+    builder.AddListeningPort(server_address, ::grpc::InsecureServerCredentials());
+
+    auto server = bond::ext::grpc::server::Start(builder, std::move(service));
 
     printf("Server ready\n");
     fflush(stdout);
 
     bool countdownSet = Countdown.wait_for(std::chrono::seconds(30));
 
-    server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(10));
-    server->Wait();
+    server.Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(10));
+    server.Wait();
 
     if (!countdownSet ||
         (NumRequestsReceived != NumRequests) ||

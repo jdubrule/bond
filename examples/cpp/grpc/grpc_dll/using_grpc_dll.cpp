@@ -8,7 +8,7 @@
 // that the DLL and the programs that consume it have to use the same
 // version of Bond.
 //
-// This program tests the use of the gRPC client and service code.
+// This program tests the use of the grpc client and service code.
 
 // Must include the _apply.h file to use the pre-compiled routines;
 // otherwise they'll be expanded again in this compilation unit.
@@ -24,7 +24,6 @@
 #include <bond/core/reflection.h>
 #include <bond/ext/grpc/io_manager.h>
 #include <bond/ext/grpc/server.h>
-#include <bond/ext/grpc/server_builder.h>
 #include <bond/ext/grpc/thread_pool.h>
 #include <bond/ext/grpc/unary_call.h>
 #include <bond/protocol/compact_binary.h>
@@ -33,26 +32,30 @@
 #include <iostream>
 #include <memory>
 
-using grpc::Channel;
-
-using grpc::Server;
-using grpc::ServerBuilder;
-using grpc::ServerContext;
+#include <boost/mpl/list.hpp>
 
 using namespace examples::grpc_dll;
 
-struct TestServiceImpl : TestService::Service
+class TestServiceImpl : public TestService<uint32_t>::Service
 {
-    void TestMethod(bond::ext::gRPC::unary_call<
-                        bond::bonded<MyStruct>,
-                        Item> call) override
+public:
+    using TestService<uint32_t>::Service::Service;
+
+private:
+    void TestMethod(bond::ext::grpc::unary_call<MyStruct, Item<uint32_t>> call) override
     {
         MyStruct request = call.request().Deserialize();
 
-        Item response;
+        Item<uint32_t> response;
         response = request.items[0];
 
         call.Finish(response);
+    }
+};
+
+struct print_metadata {
+    template<typename T> void operator()(const T&) {
+        std::cout << T::metadata.name << std::endl;
     }
 };
 
@@ -66,10 +69,10 @@ int main()
         obj.items.resize(1);
         obj.items[0].numbers.push_back(13);
 
-        Item item;
+        Item<uint32_t> item;
 
         item.numbers.push_back(11);
-        obj.item = bond::bonded<Item>(item);
+        obj.item = bond::bonded<Item<uint32_t>>(item);
 
         // Serialize
         bond::OutputBuffer buffer;
@@ -84,7 +87,7 @@ int main()
         bond::CompactBinaryReader<bond::InputBuffer> reader(data);
         bond::Deserialize(reader, obj2);
 
-        Item item2;
+        Item<uint32_t> item2;
 
         obj2.item.Deserialize(item2);
 
@@ -96,26 +99,29 @@ int main()
         bond::RuntimeSchema schema = bond::GetRuntimeSchema<MyStruct>();
 
         std::cout << schema.GetSchema().structs[schema.GetSchema().root.struct_def].fields[0].metadata.name << std::endl;
+
+        print_metadata()(TestService<uint32_t>::Schema());
+
+        boost::mpl::for_each<TestService<uint32_t>::Schema::methods>(print_metadata());
     }
 
-    { // Exercise gRPC facilities
+    { // Exercise grpc facilities
+        auto ioManager = std::make_shared<bond::ext::grpc::io_manager>();
+        bond::ext::grpc::thread_pool threadPool;
 
         const std::string server_address("127.0.0.1:50051");
 
-        auto ioManager = std::make_shared<bond::ext::gRPC::io_manager>();
-        auto threadPool = std::make_shared<bond::ext::gRPC::thread_pool>();
-
         // Create and start a service instance
-        TestServiceImpl service;
-        bond::ext::gRPC::server_builder builder;
-        builder.SetThreadPool(threadPool);
-        builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-        builder.RegisterService(&service);
-        std::unique_ptr<bond::ext::gRPC::server> server(builder.BuildAndStart());
+        std::unique_ptr<TestServiceImpl> service{ new TestServiceImpl{ threadPool } };
+
+        ::grpc::ServerBuilder builder;
+        builder.AddListeningPort(server_address, ::grpc::InsecureServerCredentials());
+
+        auto server = bond::ext::grpc::server::Start(builder, std::move(service));
 
         // Create a proxy
-        TestService::Client proxy(
-            grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()),
+        TestService<uint32_t>::Client proxy(
+            ::grpc::CreateChannel(server_address, ::grpc::InsecureChannelCredentials()),
             ioManager,
             threadPool);
     }

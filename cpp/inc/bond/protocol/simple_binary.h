@@ -3,9 +3,13 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
 #include "encoding.h"
-#include <bond/core/traits.h>
+
 #include <bond/core/bond_version.h>
+#include <bond/core/traits.h>
+
 #include <boost/call_traits.hpp>
 #include <boost/noncopyable.hpp>
 
@@ -36,8 +40,8 @@
                      string, wstring        | count | characters |
                                             '-------'------------'
 
-                           count            variable encoded uint32 count of 1-byte (for
-                                            string) or 2-byte (for wstring) Unicode code
+                           count            uint32 count of 1-byte (for string)
+                                            or 2-byte (for wstring) Unicode code
                                             units (variable encoded in v2)
 
                            characters       1-byte UTF-8 code units (for string) or 2-byte
@@ -60,6 +64,12 @@
 
                             key, mapped     each item encoded according to its type
 
+                                           .-------. .-----------.
+                    bonded                 | count | | marshaled |
+                                           '-------' '-----------'
+                            count           uint32 count of bytes (always fixed-width, even in v2)
+
+                            marshaled       a marshaled payload
 */
 
 namespace bond
@@ -384,7 +394,7 @@ protected:
 
 template <typename Input, typename MarshaledBondedProtocols> struct
 protocol_has_multiple_versions<SimpleBinaryReader<Input, MarshaledBondedProtocols> >
-    : true_type {};
+    : std::true_type {};
 
 
 template <typename Input, typename MarshaledBondedProtocols, typename Output>
@@ -396,6 +406,6 @@ bool is_protocol_version_same(const SimpleBinaryReader<Input, MarshaledBondedPro
 
 template <typename Output> struct
 may_omit_fields<SimpleBinaryWriter<Output> >
-    : false_type {};
+    : std::false_type {};
 
 } // namespace bond

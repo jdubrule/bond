@@ -21,28 +21,22 @@
 #include <bond/core/reflection.h>
 #include <bond/ext/grpc/io_manager.h>
 #include <bond/ext/grpc/server.h>
-#include <bond/ext/grpc/server_builder.h>
+#include <bond/ext/grpc/thread_pool.h>
 #include <bond/ext/grpc/unary_call.h>
 #include <bond/protocol/compact_binary.h>
 #include <bond/stream/output_buffer.h>
 
 #include <memory>
 
-using grpc::Status;
-using grpc::StatusCode;
-
-using grpc::Server;
-using grpc::ServerBuilder;
-using grpc::ServerContext;
-
 using namespace examples::grpc_static_library;
 
 class PingPongServiceImpl final : public PingPong::Service
 {
-    void Ping(
-        bond::ext::gRPC::unary_call<
-        bond::bonded<::examples::grpc_static_library::PingRequest>,
-        ::examples::grpc_static_library::PingResponse> call) override
+public:
+    using PingPong::Service::Service;
+
+private:
+    void Ping(bond::ext::grpc::unary_call<PingRequest, PingResponse> call) override
     {
         PingRequest request = call.request().Deserialize();
 
@@ -77,15 +71,15 @@ int main()
     }
 
     { // Create and start a service
-        PingPongServiceImpl service;
+        bond::ext::grpc::thread_pool threadPool;
+        std::unique_ptr<PingPongServiceImpl> service{ new PingPongServiceImpl{ threadPool } };
 
-        auto threadPool = std::make_shared<bond::ext::gRPC::thread_pool>();
-        bond::ext::gRPC::server_builder builder;
-        builder.SetThreadPool(threadPool);
         const std::string server_address("127.0.0.1:50051");
-        builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-        builder.RegisterService(&service);
-        std::unique_ptr<bond::ext::gRPC::server> server(builder.BuildAndStart());
+
+        ::grpc::ServerBuilder builder;
+        builder.AddListeningPort(server_address, ::grpc::InsecureServerCredentials());
+
+        auto server = bond::ext::grpc::server::Start(builder, std::move(service));
     }
 
     return 0;

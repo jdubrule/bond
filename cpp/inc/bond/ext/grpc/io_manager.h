@@ -3,116 +3,78 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
+#include "detail/io_manager_tag.h"
+#include "exception.h"
+#include <bond/core/detail/once.h>
+
 #ifdef _MSC_VER
     #pragma warning (push)
     #pragma warning (disable: 4100 4702)
 #endif
 
-#include <grpc++/grpc++.h>
-#include <grpc++/impl/codegen/completion_queue.h>
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/impl/codegen/completion_queue.h>
 
 #ifdef _MSC_VER
     #pragma warning (pop)
 #endif
 
-#include <bond/ext/detail/event.h>
-#include <bond/ext/grpc/detail/io_manager_tag.h>
-
 #include <boost/assert.hpp>
+#include <boost/thread/scoped_thread.hpp>
 
 #include <atomic>
 #include <memory>
 #include <thread>
 #include <vector>
 
-namespace bond { namespace ext { namespace gRPC {
+namespace bond { namespace ext { namespace grpc
+{
+    namespace detail
+    {
+        class client;
+
+    } // namespace detail
 
     /// @brief Manages a pool of threads polling for work from the same
-    /// %grpc::CompletionQueue
+    /// %::grpc::CompletionQueue
     ///
     /// All of the tags enqueued in this completion queue must inherit from
-    /// \ref io_manager_tag. If not, the behavior is undefined.
+    /// \ref detail::io_manager_tag. If not, the behavior is undefined.
     class io_manager final
     {
     public:
-        /// @brief Tag type used to indicate that an io_manager should not
-        /// automatically start its polling threads.
-        struct delay_start_tag final { };
-
-        static constexpr size_t USE_HARDWARE_CONC = 0;
-
-        /// @brief Creates and starts and io_manager.
+        /// @brief Creates and starts and io_manager with number of threads equal
+        /// to CPU/cores available.
         ///
-        /// @param numThreads the number of threads to start. If \ref
-        /// USE_HARDWARE_CONC, then a number of threads depending on the
-        /// hardware's available concurrency will be started.
-        explicit io_manager(size_t numThreads = USE_HARDWARE_CONC)
-            : _cq(new grpc::CompletionQueue),
-              _numThreads(compute_real_num_threads(numThreads)),
-              _threads(),
-              _isShutdownRequested(),
-              _isShutdownInProgress(),
-              _shutdownCompleted()
+        /// @throws InvalidThreadCount when std::thread::hardware_concurrency returns 0.
+        io_manager()
+            : io_manager{ std::thread::hardware_concurrency() }
+        {}
+
+        /// @brief Creates and starts and io_manager with specified number of threads.
+        ///
+        /// @param numThreads the number of threads to start.
+        ///
+        /// @param delay a flag to indicate if start should be delayed.
+        ///
+        /// @param cq the completion queue to poll.
+        ///
+        /// @throws InvalidThreadCount when std::thread::hardware_concurrency returns 0.
+        explicit io_manager(unsigned int numThreads, bool delay = false, std::unique_ptr<::grpc::CompletionQueue> cq = {})
+            : _cq{ cq ? std::move(cq) : std::unique_ptr<::grpc::CompletionQueue>{ new ::grpc::CompletionQueue{} } },
+              _threads{ numThreads }
         {
-            BOOST_ASSERT(_cq);
-            start();
-        }
+            if (_threads.empty())
+            {
+                throw InvalidThreadCount{};
+            }
 
-        /// @brief Creates and starts and io_manager.
-        ///
-        /// @param cq the completion queue to poll. Takes ownership.
-        ///
-        /// @param numThreads the number of threads to start. If \ref
-        /// USE_HARDWARE_CONC, then a number of threads depending on the
-        /// hardware's available concurrency will be started.
-        explicit io_manager(std::unique_ptr<grpc::CompletionQueue> cq, size_t numThreads = USE_HARDWARE_CONC)
-            : _cq(std::move(cq)),
-              _numThreads(compute_real_num_threads(numThreads)),
-              _threads(),
-              _isShutdownRequested(),
-              _isShutdownInProgress(),
-              _shutdownCompleted()
-        {
-            BOOST_ASSERT(_cq);
-            start();
-        }
-
-        /// @brief Creates an io_managed, but does not start it.
-        ///
-        /// @param numThreads the number of threads to start. If \ref
-        /// USE_HARDWARE_CONC, then a number of threads depending on the
-        /// hardware's available concurrency will be started.
-        io_manager(size_t numThreads, delay_start_tag)
-            : _cq(new grpc::CompletionQueue),
-              _numThreads(compute_real_num_threads(numThreads)),
-              _threads(),
-              _isShutdownRequested(),
-              _isShutdownInProgress(),
-              _shutdownCompleted()
-        {
-            BOOST_ASSERT(_cq);
-
-            // this overload does NOT call start()
-        }
-
-        /// @brief Creates an io_managed, but does not start it.
-        ///
-        /// @param cq the completion queue to poll. Takes ownership.
-        ///
-        /// @param numThreads the number of threads to start. If \ref
-        /// USE_HARDWARE_CONC, then a number of threads depending on the
-        /// hardware's available concurrency will be started.
-        io_manager(std::unique_ptr<grpc::CompletionQueue> cq, size_t numThreads, delay_start_tag)
-            : _cq(std::move(cq)),
-              _numThreads(compute_real_num_threads(numThreads)),
-              _threads(),
-              _isShutdownRequested(),
-              _isShutdownInProgress(),
-              _shutdownCompleted()
-        {
-            BOOST_ASSERT(_cq);
-
-            // this overload does NOT call start()
+            if (!delay)
+            {
+                start();
+            }
         }
 
         /// Waits for the \p io_manager to stop.
@@ -126,7 +88,7 @@ namespace bond { namespace ext { namespace gRPC {
         ///
         /// @note Ownership of the completion queue remains with the
         /// io_manager.
-        grpc::CompletionQueue* cq()
+        ::grpc::CompletionQueue* cq()
         {
             return _cq.get();
         }
@@ -141,23 +103,13 @@ namespace bond { namespace ext { namespace gRPC {
         void start()
         {
             BOOST_ASSERT(_cq);
+            BOOST_ASSERT(!_threads.empty());
 
-            if (_threads.empty())
+            for (auto& t : _threads)
             {
-                _threads.reserve(_numThreads);
-
-                for (size_t i = 0; i < _numThreads; ++i)
+                if (!t.joinable())
                 {
-                    _threads.emplace_back([this]()
-                    {
-                        void* tag;
-                        bool ok;
-                        while (_cq->Next(&tag, &ok))
-                        {
-                            BOOST_ASSERT(tag);
-                            static_cast<detail::io_manager_tag*>(tag)->invoke(ok);
-                        }
-                    });
+                    t = boost::scoped_thread<>{ [this]{ run(); } };
                 }
             }
         }
@@ -165,7 +117,7 @@ namespace bond { namespace ext { namespace gRPC {
         /// @brief Requests that the io_manager shutdown.
         ///
         /// @remarks If the io_manager is being used for by a
-        /// bond::ext::gRPC::server, that server needs to be shutdown first.
+        /// bond::ext::grpc::server, that server needs to be shutdown first.
         ///
         /// @remarks Can be called from multiple threads concurrently.
         void shutdown()
@@ -191,49 +143,33 @@ namespace bond { namespace ext { namespace gRPC {
         /// return.
         void wait()
         {
-            bool shouldShutdown = !_isShutdownInProgress.test_and_set();
-            if (shouldShutdown)
-            {
-                // borrow the current thread to clean up
-                for (auto& thread : _threads)
-                {
-                    BOOST_ASSERT(thread.joinable());
-                    thread.join();
-                }
-
-                _threads.clear();
-
-                _cq.reset();
-                _shutdownCompleted.set();
-            }
-            else
-            {
-                // some other thread is performing clean up, so wait for it
-                _shutdownCompleted.wait();
-            }
+            bond::detail::call_once(_waitFlag, [this]{ _threads.clear(); });
         }
 
     private:
-        static size_t compute_real_num_threads(size_t numThreads)
-        {
-            if (numThreads == USE_HARDWARE_CONC)
-            {
-                numThreads = static_cast<size_t>(std::thread::hardware_concurrency());
-            }
+        friend class detail::client;
 
-            // hardware_concurency can fail and return 0. If so, we need a
-            // non-zero number of threads.
-            const size_t recourseNumThreads = 2;
-            return numThreads != 0 ? numThreads : recourseNumThreads;
+        const std::shared_ptr<::grpc::CompletionQueue>& shared_cq() const
+        {
+            return _cq;
         }
 
-        std::unique_ptr<grpc::CompletionQueue> _cq;
-        size_t _numThreads;
-        std::vector<std::thread> _threads;
+        void run()
+        {
+            void* tag;
+            bool ok;
+            while (_cq->Next(&tag, &ok))
+            {
+                BOOST_ASSERT(tag);
+                static_cast<detail::io_manager_tag*>(tag)->invoke(ok);
+            }
+        }
 
-        std::atomic_flag _isShutdownRequested;
-        std::atomic_flag _isShutdownInProgress;
-        bond::ext::detail::event _shutdownCompleted;
+        std::shared_ptr<::grpc::CompletionQueue> _cq;
+        std::vector<boost::scoped_thread<>> _threads;
+
+        std::atomic_flag _isShutdownRequested = ATOMIC_FLAG_INIT;
+        bond::detail::once_flag _waitFlag{};
     };
 
-} } } // namespace bond::ext::gRPC
+} } } // namespace bond::ext::grpc

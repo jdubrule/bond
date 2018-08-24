@@ -3,10 +3,14 @@
 
 #pragma once
 
-#include <bond/core/containers.h>
+#include <bond/core/config.h>
+
 #include <bond/core/blob.h>
+#include <bond/core/containers.h>
 #include <bond/core/traits.h>
+
 #include <boost/static_assert.hpp>
+
 #include <cstring>
 
 namespace bond
@@ -81,12 +85,7 @@ public:
     typename boost::disable_if<is_string_type<T> >::type
     Read(T& value)
     {
-        // T needs to be trivially copyable to use std::memcpy.
-        // std::is_trivially_copyable isn't available until C++11, so we use
-        // bond::is_arithmetic instead. This works, because we only ever
-        // read arithmetic types in this version of Read(), so we don't need
-        // the full generality.
-        BOOST_STATIC_ASSERT(bond::is_arithmetic<T>::value);
+        BOOST_STATIC_ASSERT(std::is_trivially_copyable<T>::value);
         // We only have 64 bits of randomness, so T needs to fit in that.
         BOOST_STATIC_ASSERT(sizeof(T) <= sizeof(uint64_t));
 
@@ -167,14 +166,15 @@ public:
         resize_string(value, length);
 
         typename element_type<T>::type* p = string_data(value);
+        typename element_type<T>::type* const p_end = p + length;
 
-        for (unsigned i = 0; i < length; ++i)
+        for (; p != p_end; ++p)
         {
             uint8_t c;
 
             Read(c);
 
-            p[i] = typename element_type<T>::type(' ') + c % ('z' - ' ');
+            *p = typename element_type<T>::type(' ') + c % ('z' - ' ');
         }
     }
 
@@ -182,9 +182,13 @@ public:
     void Read(blob& value, uint32_t size)
     {
         boost::shared_ptr<char[]> buffer(boost::make_shared_noinit<char[]>(size));
+        char* p = buffer.get();
+        char* const p_end = p + size;
 
-        for (unsigned i = 0; i < size; ++i)
-            Read(buffer[i]);
+        for (; p != p_end; ++p)
+        {
+            Read(*p);
+        }
 
         value.assign(buffer, size);
     }
@@ -219,10 +223,10 @@ private:
 
 template <typename Unused> struct
 uses_marshaled_bonded<RandomProtocolReader, Unused>
-    : boost::false_type {};
+    : std::false_type {};
 
 template <typename Unused> struct
 uses_marshaled_bonded<RandomProtocolReader&, Unused>
-    : boost::false_type {};
+    : std::false_type {};
 
 }

@@ -3,17 +3,19 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
+#include <bond/core/config.h>
+
 #include <stdint.h>
 #include <stdio.h>
+#include <string>
+#include <vector>
 
 namespace bond
 {
 
 namespace detail
 {
-    
+
 template<uint16_t Size, typename Allocator = std::allocator<char> >
 class basic_string_stream
 {
@@ -32,7 +34,7 @@ public:
     }
 
     basic_string_stream& operator<<(const char* str)
-    {        
+    {
         while (*str)
         {
             write(*str++);
@@ -54,67 +56,10 @@ public:
         return *this;
     }
 
-    basic_string_stream& operator<<(int value)
+    template <typename T>
+    basic_string_stream& operator<<(const T& value)
     {
-        char str[256];
-        *str = '\0';
-
-        ::sprintf(str, "%d", value);
-        return *this << str;
-    }
-
-    basic_string_stream& operator<<(unsigned int value)
-    {
-        char str[256];
-        *str = '\0';
-
-        ::sprintf(str, "%u", value);
-        return *this << str;
-    }
-
-    basic_string_stream& operator<<(long value)
-    {
-        char str[256];
-        *str = '\0';
-
-        ::sprintf(str, "%ld", value);
-        return *this << str;
-    }
-
-    basic_string_stream& operator<<(unsigned long value)
-    {
-        char str[256];
-        *str = '\0';
-
-        ::sprintf(str, "%lu", value);
-        return *this << str;
-    }
-
-    basic_string_stream& operator<<(long long value)
-    {
-        char str[256];
-        *str = '\0';
-
-        ::sprintf(str, "%lld", value);
-        return *this << str;
-    }
-
-    basic_string_stream& operator<<(unsigned long long value)
-    {
-        char str[256];
-        *str = '\0';
-        
-        ::sprintf(str, "%llu", value);
-        return *this << str;
-    }
-
-    basic_string_stream& operator<<(double value)
-    {
-        char str[256];
-        *str = '\0';
-
-        ::sprintf(str, "%f", value);
-        return *this << str;
+        return *this << std::to_string(value);
     }
 
     std::string str() const
@@ -127,7 +72,7 @@ public:
         return &buffer[0];
     }
 
-private:    
+private:
     void write(char ch)
     {
         buffer.back() = ch;
@@ -137,12 +82,12 @@ private:
     template<typename I>
     void write(I begin, I end)
     {
-        for ( ; begin != end; ++begin) 
+        for ( ; begin != end; ++begin)
         {
             write(*begin);
         }
     }
-    
+
     std::vector<char, Allocator> buffer;
 };
 

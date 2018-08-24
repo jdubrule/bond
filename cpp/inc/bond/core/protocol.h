@@ -3,70 +3,62 @@
 
 #pragma once
 
-#include "traits.h"
+#include <bond/core/config.h>
+
 #include "customize.h"
 #include "detail/any.h"
 #include "detail/mpl.h"
 #include "detail/odr.h"
 #include "detail/visit_any.h"
-#include <bond/stream/input_buffer.h>
-#include <bond/protocol/simple_binary.h>
+#include "traits.h"
+
 #include <bond/protocol/compact_binary.h>
 #include <bond/protocol/fast_binary.h>
+#include <bond/protocol/simple_binary.h>
 #include <bond/protocol/simple_json_reader.h>
+#include <bond/stream/input_buffer.h>
 
 #include <boost/make_shared.hpp>
 #include <boost/optional.hpp>
 #include <boost/ref.hpp>
 
-#if !defined(BOND_COMPACT_BINARY_PROTOCOL) \
- && !defined(BOND_SIMPLE_BINARY_PROTOCOL) \
- && !defined(BOND_FAST_BINARY_PROTOCOL) \
- && !defined(BOND_SIMPLE_JSON_PROTOCOL)
-
-#   define BOND_COMPACT_BINARY_PROTOCOL
-#   define BOND_SIMPLE_BINARY_PROTOCOL
-#   define BOND_FAST_BINARY_PROTOCOL
-// BOND_SIMPLE_JSON_PROTOCOL disabled by default
-
-#endif
 
 namespace bond
 {
 
 #ifdef BOND_COMPACT_BINARY_PROTOCOL
-template <typename Buffer> struct 
-is_protocol_enabled<CompactBinaryReader<Buffer> > 
-    : true_type {};
-#endif 
+template <typename Buffer> struct
+is_protocol_enabled<CompactBinaryReader<Buffer> >
+    : std::true_type {};
+#endif
 
 #ifdef BOND_SIMPLE_BINARY_PROTOCOL
 template <typename Buffer, typename MarshaledBondedProtocols> struct
 is_protocol_enabled<SimpleBinaryReader<Buffer, MarshaledBondedProtocols> >
-    : true_type {};
-#endif 
+    : std::true_type {};
+#endif
 
 #ifdef BOND_SIMPLE_JSON_PROTOCOL
-template <typename Buffer> struct 
-is_protocol_enabled<SimpleJsonReader<Buffer> > 
-    : true_type {};
-#endif 
+template <typename Buffer> struct
+is_protocol_enabled<SimpleJsonReader<Buffer> >
+    : std::true_type {};
+#endif
 
 #ifdef BOND_FAST_BINARY_PROTOCOL
-template <typename Buffer> struct 
-is_protocol_enabled<FastBinaryReader<Buffer> > 
-    : true_type {};
-#endif 
+template <typename Buffer> struct
+is_protocol_enabled<FastBinaryReader<Buffer> >
+    : std::true_type {};
+#endif
 
 // uses_static_parser
 template <typename Reader, typename Enable = void> struct
 uses_static_parser
-    : false_type {};
+    : std::false_type {};
 
 template <typename Reader> struct
 uses_static_parser<Reader, typename boost::enable_if<
-    is_same<typename Reader::Parser, StaticParser<Reader&> > >::type>
-    : true_type {};
+    std::is_same<typename Reader::Parser, StaticParser<Reader&> > >::type>
+    : std::true_type {};
 
 template <typename Reader> struct
 uses_static_parser<Reader&>
@@ -75,12 +67,12 @@ uses_static_parser<Reader&>
 // uses_dynamic_parser
 template <typename Reader, typename Enable = void> struct
 uses_dynamic_parser
-    : false_type {};
+    : std::false_type {};
 
 template <typename Reader> struct
 uses_dynamic_parser<Reader, typename boost::enable_if<
-    is_same<typename Reader::Parser, DynamicParser<Reader&> > >::type>
-    : true_type {};
+    std::is_same<typename Reader::Parser, DynamicParser<Reader&> > >::type>
+    : std::true_type {};
 
 template <typename Reader> struct
 uses_dynamic_parser<Reader&>
@@ -89,19 +81,19 @@ uses_dynamic_parser<Reader&>
 // uses_dom_parser
 template <typename Reader, typename Enable = void> struct
 uses_dom_parser
-    : false_type {};
+    : std::false_type {};
 
 template <typename Reader> struct
 uses_dom_parser<Reader, typename boost::enable_if<
-    is_same<typename Reader::Parser, DOMParser<Reader&> > >::type>
-    : true_type {};
+    std::is_same<typename Reader::Parser, DOMParser<Reader&> > >::type>
+    : std::true_type {};
 
 template <typename Reader> struct
 uses_dom_parser<Reader&>
     : uses_dom_parser<Reader> {};
 
 
-template <typename Reader, typename Unused> struct 
+template <typename Reader, typename Unused> struct
 uses_marshaled_bonded
     : uses_static_parser<Reader> {};
 
@@ -178,7 +170,7 @@ struct ValueReader
         : instance(boost::static_pointer_cast<const void>(value)),
           pointer(instance.get())
     {}
-    
+
     ValueReader(const ValueReader& value) BOND_NOEXCEPT
         : instance(value.instance),
           pointer(value.pointer)

@@ -18,6 +18,15 @@ if (BOND_GBC_PATH)
     message (STATUS "Existing GBC executable found: '${GBC_EXECUTABLE}'")
 endif()
 
+set (BOND_USE_CCACHE
+    "FALSE"
+    CACHE BOOL "If TRUE, then use ccache")
+
+if (BOND_USE_CCACHE)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+endif()
+
 if (MSVC)
     # MSVC needs this because of how template-heavy our code is.
     add_compile_options (/bigobj)
@@ -35,6 +44,12 @@ if (MSVC)
     # Bond with MSVC CRT-specific code too much. More details at
     # https://msdn.microsoft.com/en-us/library/ms175759.aspx
     add_definitions (-D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES=1 -D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT=1)
+
+    # Disable code analysis warnings about constant constant comparisons. A
+    # lot of our template functions trigger this when they do things like:
+    #
+    # if (T == traits<U>::some_value) { ... } else { ... }
+    add_compile_options(/wd6326)
 
     # Enable standards-conformance mode for MSVC compilers that support this
     # flag (Visual C++ 2017 and later).
@@ -60,20 +75,6 @@ if (WIN32)
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/core/bin/debug"
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/core/bin/retail")
 
-    find_program (BOND_CSHARP_COMM_COMPAT_SERVER CommCompatServer.exe
-        PATH_SUFFIXES net45
-        NO_DEFAULT_PATH
-        PATHS
-            "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/comm/server/bin/debug"
-            "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/comm/server/bin/retail")
-
-    find_program (BOND_CSHARP_COMM_COMPAT_CLIENT CommCompatClient.exe
-        PATH_SUFFIXES net45
-        NO_DEFAULT_PATH
-        PATHS
-            "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/comm/client/bin/debug"
-            "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/comm/client/bin/retail")
-
     find_program (BOND_CSHARP_GRPC_COMPAT_SERVER GrpcCompatServer.exe
         PATH_SUFFIXES net45
         NO_DEFAULT_PATH
@@ -88,6 +89,15 @@ if (WIN32)
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/grpc/client/bin/debug"
             "${CMAKE_CURRENT_SOURCE_DIR}/cs/test/compat/grpc/client/bin/retail")
 endif()
+
+# find Java libraries and programs
+find_file (BOND_JAVA_CORE bond-5.0.0.jar
+    NO_DEFAULT_PATH
+    PATHS "${CMAKE_CURRENT_SOURCE_DIR}/java/core/build/libs")
+
+find_file (BOND_JAVA_COMPAT_TEST compat-1.0.jar
+    NO_DEFAULT_PATH
+    PATHS "${CMAKE_CURRENT_SOURCE_DIR}/java/compat/build/libs")
 
 # find python interpreter, library and boost python library.
 # to specify a different version, invoke cmake with:
@@ -113,7 +123,7 @@ if (APPLE)
 endif()
 find_package (PythonLibs 2.7)
 
-find_package (Boost 1.53.0
+find_package (Boost 1.58.0
     OPTIONAL_COMPONENTS
         chrono
         date_time
@@ -143,6 +153,7 @@ cxx_add_compile_options(Clang
     --std=c++11
     -Wall
     -Werror
+    -Wno-null-dereference
     -Wno-unknown-warning-option
     -Wno-unused-local-typedefs)
 
@@ -152,6 +163,7 @@ cxx_add_compile_options(AppleClang
     --std=c++11
     -Wall
     -Werror
+    -Wno-null-dereference
     -Wno-unknown-warning-option
     -Wno-unused-local-typedefs)
 
@@ -161,14 +173,23 @@ cxx_add_compile_options(GNU
     --std=c++11
     -Wall
     -Werror
-    -Wno-unknown-warning-option
+    # Suppress warnings in Boost about using deprecated types like std::auto_ptr
+    -Wno-deprecated-declarations
     -Wno-unused-local-typedefs)
 
 include_directories (
     ${BOND_INCLUDE}
     ${BOND_GENERATED}
-    ${Boost_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/rapidjson/include)
+    ${Boost_INCLUDE_DIRS})
+
+if (BOND_FIND_RAPIDJSON)
+    find_package(RapidJSON REQUIRED)
+    include_directories (
+        ${RapidJSON_INCLUDE_DIRS})
+else()
+    include_directories (
+        ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/rapidjson/include)
+endif()
 
 set (BOND_LIBRARIES_ONLY
     "FALSE"
@@ -176,11 +197,11 @@ set (BOND_LIBRARIES_ONLY
 
 set (BOND_LIBRARIES_INSTALL_CPP
     "FALSE"
-    CACHE BOOL "If TRUE, the generated .cpp files for the Bond libraries will be installed under src/ as part of the INSTALL target.")
+    CACHE BOOL "If TRUE, the .cpp files for the Bond libraries will be installed under src/ as part of the INSTALL target.")
 
-set (BOND_ENABLE_COMM
+set (BOND_ENABLE_JAVA
     "FALSE"
-    CACHE BOOL "If FALSE, then do not build Comm")
+    CACHE BOOL "If TRUE, then build Java libraries")
 
 set (BOND_SKIP_GBC_TESTS
     "FALSE"
@@ -190,6 +211,14 @@ set (BOND_SKIP_CORE_TESTS
     "FALSE"
     CACHE BOOL "If TRUE, then skip Bond Core tests and examples")
 
-if (((BOND_ENABLE_COMM) OR (BOND_ENABLE_GRPC)) AND ((CXX_STANDARD LESS 11) OR (MSVC_VERSION LESS 1800)))
-    message(FATAL_ERROR "BOND_ENABLE_COMM and/or BOND_ENABLE_GRPC is TRUE but compiler specified does not support C++11 standard")
+set (BOND_SKIP_COMPAT_TESTS
+    "FALSE"
+    CACHE BOOL "If TRUE, then skip Bond Compat tests")
+
+set (BOND_STACK_OPTIONS
+    ""
+    CACHE STRING "Options to pass to Haskell Stack")
+
+if (BOND_ENABLE_GRPC AND ((CXX_STANDARD LESS 11) OR (MSVC_VERSION LESS 1800)))
+    message(FATAL_ERROR "BOND_ENABLE_GRPC is TRUE but compiler specified does not support C++11 standard")
 endif()

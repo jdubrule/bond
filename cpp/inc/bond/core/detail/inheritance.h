@@ -3,14 +3,18 @@
 
 #pragma once
 
+#include <bond/core/config.h>
+
+#include "omit_default.h"
+
 namespace bond
 {
 
 
-template <typename Input> 
+template <typename Input>
 struct base_input
 {
-    BOOST_STATIC_ASSERT(is_reference<Input>::value);
+    BOOST_STATIC_ASSERT(std::is_reference<Input>::value);
     typedef Input type;
     static type from(type input)
     {
@@ -22,17 +26,17 @@ struct base_input
 namespace detail
 {
 
-template <typename T, typename Enable = void> struct 
+template <typename T, typename Enable = void> struct
 hierarchy_depth
     : std::integral_constant<uint16_t, 1> {};
 
 
-template <typename T> struct 
-hierarchy_depth<T, typename boost::enable_if<is_class<typename schema<typename T::base>::type> >::type>
+template <typename T> struct
+hierarchy_depth<T, typename boost::enable_if<std::is_class<typename schema<typename T::base>::type> >::type>
     : std::integral_constant<uint16_t, 1 + hierarchy_depth<typename schema<typename T::base>::type>::value> {};
 
 
-template <typename T> struct 
+template <typename T> struct
 expected_depth
     : std::integral_constant<uint16_t, 0xffff> {};
 
@@ -75,7 +79,7 @@ protected:
 
         // The hierarchy of the payload schema is deeper than what the transform "expects".
         // We recursively find the matching level to start parsing from.
-        // After we finish parsing the expected parts of the hierarchy, we give 
+        // After we finish parsing the expected parts of the hierarchy, we give
         // the parser a chance to skip the unexpected parts.
         detail::StructBegin(_input, true);
 
@@ -88,7 +92,7 @@ protected:
         return result;
     }
 
-    
+
     template <typename T, typename Transform>
     typename boost::disable_if_c<(hierarchy_depth<T>::value > expected_depth<Transform>::value), bool>::type
     Read(const T&, const Transform& transform)
@@ -97,10 +101,17 @@ protected:
         // First we recurse into base structs (serialized data starts at the top of the hierarchy)
         // and then we read to the transform the fields of the top level struct.
         transform.Begin(T::metadata);
-        ReadBase(base_class<T>(), transform);
-        bool result = static_cast<Parser*>(this)->ReadFields(typename boost::mpl::begin<typename T::fields>::type(), transform);
+
+        bool done = ReadBase(base_class<T>(), transform);
+
+        if (!done)
+        {
+            done = static_cast<Parser*>(this)->ReadFields(typename boost::mpl::begin<typename T::fields>::type(), transform);
+        }
+
         transform.End();
-        return result;
+
+        return done;
     }
 
 
@@ -134,7 +145,7 @@ protected:
     bool Read(const RuntimeSchema& schema, const Transform& transform)
     {
         // The logic is the same as for compile-time schemas, described in the comments above.
-        bool result;
+        bool done;
 
         typename base_input<Input>::type base(base_input<Input>::from(_input));
 
@@ -144,7 +155,7 @@ protected:
 
             detail::StructBegin(_input, true);
 
-            result = Parser(base, _base).Read(schema.GetBaseSchema(), transform);
+            done = Parser(base, _base).Read(schema.GetBaseSchema(), transform);
 
             detail::StructEnd(_input, true);
 
@@ -153,15 +164,18 @@ protected:
         else
         {
             transform.Begin(schema.GetStruct().metadata);
-            
-            if (schema.HasBase())
-                transform.Base(bonded<void, Input>(base, schema.GetBaseSchema(), true));
 
-            result = static_cast<Parser*>(this)->ReadFields(schema, transform);
+            done = schema.HasBase() && transform.Base(bonded<void, Input>(base, schema.GetBaseSchema(), true));
+
+            if (!done)
+            {
+                done = static_cast<Parser*>(this)->ReadFields(schema, transform);
+            }
+
             transform.End();
         }
 
-        return result;
+        return done;
     }
 
     Input _input;

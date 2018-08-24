@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\..\..\cs\build\nuget\Bond.CSharp.props" />
+  <PropertyGroup>
+    <ProjectGuid>{51F4135B-2CEF-436F-91CE-A6548B37E459}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>scalar</RootNamespace>
+    <AssemblyName>grpc-scalar</AssemblyName>
+    <TargetFrameworks>net45</TargetFrameworks>
+    <BondOptions>--grpc</BondOptions>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Grpc.Core" Version="1.12.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- This import is not needed when consuming Bond via NuGet packages.
+         Due to the different layout of the Bond repository, we manually
+         specify it here. -->
+    <BondImportDirectory Include="..\..\..\..\idl" />
+    <!-- Resharper Workaround -->
+    <Compile Include="$(IntermediateOutputPath)\scalar_types.cs" Condition="False" />
+    <Compile Include="$(IntermediateOutputPath)\scalar_grpc.cs" Condition="False" />
+    <!-- End Resharper Workaround -->
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Attributes">
+      <HintPath>$(BOND_BINARY_PATH)\net45\Bond.Attributes.dll</HintPath>
+    </Reference>
+    <Reference Include="Bond">
+      <HintPath>$(BOND_BINARY_PATH)\net45\Bond.dll</HintPath>
+    </Reference>
+    <Reference Include="Bond.IO">
+      <HintPath>$(BOND_BINARY_PATH)\net45\Bond.IO.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\cs\src\grpc\grpc.csproj" />
+  </ItemGroup>
+  <Import Project="$(BOND_PATH)\build\nuget\Bond.CSharp.targets" />
+</Project>

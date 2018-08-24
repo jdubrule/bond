@@ -11,7 +11,8 @@ function (add_unit_test)
         bond
         unit_test_codegen1
         unit_test_codegen2
-        unit_test_codegen3)
+        unit_test_codegen3
+        unit_test_codegen4)
     target_include_directories (${name} PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
@@ -22,19 +23,35 @@ function (add_unit_test)
         -DBOND_FAST_BINARY_PROTOCOL
         -DBOND_SIMPLE_JSON_PROTOCOL)
     target_link_libraries (${name} PRIVATE
-      bond
-      core_test_common
-      ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
+      core_test_common)
 endfunction()
 
 
 # Build common code into its own library.
-add_library (core_test_common EXCLUDE_FROM_ALL "main.cpp" "idl.cpp")
+add_library (core_test_common
+    EXCLUDE_FROM_ALL
+    "main.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_core_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/allocator_test_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test1_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/import_test1_apply.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/dir1/dir2/import_test2_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/apply_test_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/apply_test_apply.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/validation_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/scope_test1_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/scope_test2_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/cmdargs_types.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/unit_test_core_apply.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/capped_allocator_tests_generated/allocator_test_types.cpp")
 add_target_to_folder (core_test_common)
 add_dependencies(core_test_common
     unit_test_codegen1
     unit_test_codegen2
-    unit_test_codegen3)
+    unit_test_codegen3
+    unit_test_codegen4
+    unit_test_codegen_import2)
 target_include_directories (core_test_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
@@ -44,13 +61,14 @@ target_compile_definitions (core_test_common PUBLIC
         -DBOND_SIMPLE_BINARY_PROTOCOL
         -DBOND_FAST_BINARY_PROTOCOL
         -DBOND_SIMPLE_JSON_PROTOCOL)
-target_link_libraries (core_test_common PRIVATE
+target_link_libraries (core_test_common PUBLIC
+    bond
     ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
-
 
 add_bond_codegen (TARGET unit_test_codegen1
     unit_test.bond
     OPTIONS
+        --import-dir=imports
         --using=\"static_string=std::array<char, {0}>\"
         --using=\"static_wstring=std::array<wchar_t, {0}>\"
         --using=\"simple_list=SimpleList<{0}>\"
@@ -61,13 +79,13 @@ add_bond_codegen (TARGET unit_test_codegen2
     unit_test_core.bond
     apply_test.bond
     import_test1.bond
-    import_test2.bond
     scope_test1.bond
     scope_test2.bond
     validation.bond
     cmdargs.bond
     OPTIONS
-        --header=\\\"custom_protocols.h\\\")
+      --import-dir=imports
+      --header=\\\"custom_protocols.h\\\")
 
 add_bond_codegen (TARGET unit_test_codegen3
     allocator_test.bond
@@ -77,6 +95,21 @@ add_bond_codegen (TARGET unit_test_codegen3
         --header=\\\"allocators.h\\\"
         --allocator=TestAllocator)
 
+add_bond_codegen (TARGET unit_test_codegen4
+    allocator_test.bond
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/capped_allocator_tests_generated"
+    OPTIONS
+        --using=\"Vector=std::vector<{0}, bond::ext::capped_allocator<std::allocator<{0}> > >\"
+        --header=\"<bond/ext/capped_allocator.h>\"
+        --allocator=\"bond::ext::capped_allocator<>\"
+        --namespace=\"allocator_test=capped_allocator_tests\")
+
+add_bond_codegen (TARGET unit_test_codegen_import2
+    imports/dir1/dir2/import_test2.bond
+    # Need a custom output path so the generated #include paths line up
+    OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/dir1/dir2
+    OPTIONS
+        --header=\\\"custom_protocols.h\\\")
 
 # Full unit test is too big, .pdb files exceed compiler limit;
 # Since debugging such large executable is not practical anyways,
@@ -92,6 +125,8 @@ add_unit_test (basic_type_lists.cpp)
 add_unit_test (basic_type_map.cpp)
 add_unit_test (blob_tests.cpp)
 add_unit_test (bonded_tests.cpp)
+add_unit_test (capped_allocator_tests.cpp)
+add_unit_test (checked_test.cpp)
 add_unit_test (cmdargs.cpp)
 add_unit_test (container_extensibility.cpp
     associative_container_extensibility.cpp)
